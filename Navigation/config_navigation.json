@@ -1,0 +1,70 @@
+{
+  "navigation": {
+    "description": "Configuration de navigation 3D personnalisée",
+    "camera": {
+      "fov": 60,
+      "near": 0.1,
+      "far": 10000,
+      "auto_rotate": false,
+      "auto_rotate_speed": 0.01
+    },
+    "controls": {
+      "damping": true,
+      "damping_factor": 0.05,
+      "zoom_speed": 1.5,
+      "pan_speed": 1.0,
+      "rotate_speed": 1.0
+    },
+    "lighting": {
+      "ambient": {
+        "color": "#ffffff",
+        "intensity": 0.6
+      },
+      "directional": {
+        "color": "#ffffff",
+        "intensity": 0.8,
+        "position": [5, 10, 7],
+        "cast_shadow": true,
+        "shadow_map_size": 2048
+      },
+      "point": {
+        "color": "#6699ff",
+        "intensity": 0.3,
+        "position": [-5, 5, -5]
+      }
+    },
+    "rendering": {
+      "antialias": true,
+      "shadows": true,
+      "shadow_type": "PCFShadowShadowMap",
+      "background_color": "#0a0a0a",
+      "fog": {
+        "enabled": true,
+        "color": "#0a0a0a",
+        "near_factor": 1.0,
+        "far_factor": 2.0
+      }
+    },
+    "ui": {
+      "show_minimap": true,
+      "show_stats": true,
+      "show_controls": true,
+      "show_info": true,
+      "minimap_size": 200,
+      "theme": "dark"
+    },
+    "performance": {
+      "target_fps": 60,
+      "use_worker": false,
+      "level_of_detail": "auto"
+    }
+  },
+  "reconstruction": {
+    "memory_efficient_inference": true,
+    "minibatch_size": 1,
+    "use_amp": true,
+    "amp_dtype": "bf16",
+    "apply_mask": true,
+    "mask_edges": true
+  }
+}

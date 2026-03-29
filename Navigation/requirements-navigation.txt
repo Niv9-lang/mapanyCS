@@ -1,0 +1,19 @@
+# Dépendances pour l'application de Navigation 3D
+
+# Serveur web
+flask==3.0.0
+
+# Chargement et traitement des modèles 3D
+trimesh==3.23.5
+numpy==1.24.3
+
+# Note: PyTorch doit être installé séparément selon votre système:
+# 
+# GPU NVIDIA CUDA:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#
+# CPU:
+#   pip install torch torchvision torchaudio
+#
+# Apple Silicon (M1/M2/M3):
+#   pip install torch torchvision torchaudio

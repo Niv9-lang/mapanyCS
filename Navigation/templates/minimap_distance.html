@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimap 3D - Distances</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            background: #050711;
+        }
+        #distance-layout {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 24px;
+            padding: 20px;
+        }
+        #distance-panel {
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 10px;
+            padding: 16px 18px;
+            border: 2px solid #00ff88;
+            min-width: 260px;
+            max-width: 320px;
+            color: #e0e0e0;
+        }
+        #distance-panel h2 {
+            margin-bottom: 10px;
+            font-size: 18px;
+            color: #00ff88;
+        }
+        #distance-values {
+            margin-top: 12px;
+            font-family: "Courier New", monospace;
+            font-size: 13px;
+        }
+        .dist-row {
+            margin: 4px 0;
+        }
+        .dist-label {
+            color: #aaaaaa;
+            margin-right: 4px;
+        }
+        .dist-value {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        #minimap-distance-container {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid #0066ff;
+            box-shadow: 0 0 30px rgba(0, 102, 255, 0.4);
+        }
+        #minimap-distance-wrapper {
+            overflow: hidden;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+        #minimap-distance {
+            display: block;
+            background: #080b16;
+        }
+        #minimap-distance-legend {
+            font-size: 11px;
+            color: #7fa9ff;
+            margin-top: 8px;
+            text-align: center;
+        }
+        #view-buttons {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        #view-buttons button {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+        #view-buttons button.active {
+            background: linear-gradient(135deg, #0066ff 0%, #00aaff 100%);
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="distance-layout">
+        <div id="minimap-distance-container">
+            <div id="view-buttons">
+                <button id="view-xz">Haut (XZ)</button>
+                <button id="view-xy">Face (XY)</button>
+                <button id="view-yz">Côté (YZ)</button>
+                <button id="btn-clear">Effacer</button>
+            </div>
+            <div id="minimap-distance-wrapper">
+                <canvas id="minimap-distance" width="520" height="520"></canvas>
+            </div>
+            <div id="minimap-distance-legend">
+                Clic 1 : point A • Clic 2 : point B • Molette : zoom • Glisser : déplacer
+            </div>
+        </div>
+
+        <div id="distance-panel">
+            <h2>Distances dans la salle</h2>
+            <p>Cette vue travaille directement dans le repère 3D du modèle. Les distances sont exprimées dans la même unité que la reconstruction (mètres pour MapAnything métrique).</p>
+            <div id="distance-values">
+                <div class="dist-row"><span class="dist-label">Vue :</span><span id="dist-view" class="dist-value">XZ</span></div>
+                <div class="dist-row"><span class="dist-label">Point A :</span><span id="dist-a" class="dist-value">–</span></div>
+                <div class="dist-row"><span class="dist-label">Point B :</span><span id="dist-b" class="dist-value">–</span></div>
+                <div class="dist-row"><span class="dist-label">Distance 2D :</span><span id="dist-2d" class="dist-value">–</span></div>
+                <div class="dist-row"><span class="dist-label">Distance 3D :</span><span id="dist-3d" class="dist-value">–</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js de base (uniquement pour Vector3 / maths) -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="{{ url_for('static', filename='js/minimap_distance.js') }}"></script>
+</body>
+</html>
+

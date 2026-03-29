@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orientation — MapAnything</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:     #07090f;
+            --bg2:    #0d1220;
+            --bg3:    #111827;
+            --border: #1e2d4a;
+            --accent: #00e5ff;
+            --green:  #a3e635;
+            --red:    #ff3d6e;
+            --yellow: #ffc107;
+            --orange: #ff7c20;
+            --text:   #c8d8f0;
+            --dim:    #5a7090;
+            --mono:   'Space Mono', monospace;
+            --sans:   'Syne', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+        header { display:flex; align-items:center; justify-content:space-between; padding:10px 20px; border-bottom:1px solid var(--border); background:var(--bg2); flex-shrink:0; }
+        header h1 { font-size:14px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+        .nav-links a { color:var(--dim); text-decoration:none; font-size:12px; font-family:var(--mono); margin-left:16px; transition:color .2s; }
+        .nav-links a:hover, .nav-links a.active { color:var(--accent); }
+
+        .layout { flex:1; display:flex; overflow:hidden; }
+
+        /* ── Canvas (carte 2D + position) ── */
+        #canvas-panel { flex:1; position:relative; background:var(--bg); overflow:hidden; }
+        #map-canvas   { display:block; image-rendering:pixelated; }
+
+        #canvas-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+        #canvas-hint p { font-family:var(--mono); font-size:12px; color:var(--dim); text-align:center; line-height:1.7; }
+        #canvas-hint.hidden { display:none; }
+
+        #cursor-coords { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-family:var(--mono); font-size:11px; color:var(--dim); background:rgba(7,9,15,.85); padding:3px 12px; border-radius:12px; border:1px solid var(--border); pointer-events:none; }
+
+        /* ── Panneau latéral ── */
+        #side-panel { width:300px; flex-shrink:0; background:var(--bg2); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; }
+        #side-panel::-webkit-scrollbar { width:4px; }
+        #side-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+        .section { padding:12px 16px; border-bottom:1px solid var(--border); }
+        .section:last-child { border-bottom:none; }
+        .section-title { font-size:10px; font-family:var(--mono); font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+
+        /* ── Upload ── */
+        #drop-zone {
+            border:2px dashed var(--border); border-radius:6px; padding:20px 12px;
+            text-align:center; cursor:pointer; transition:all .2s; margin-bottom:10px;
+        }
+        #drop-zone:hover, #drop-zone.drag-over { border-color:var(--accent); background:rgba(0,229,255,.04); }
+        #drop-zone .dz-icon { font-size:24px; margin-bottom:6px; }
+        #drop-zone .dz-label { font-family:var(--mono); font-size:11px; color:var(--dim); line-height:1.5; }
+        #drop-zone .dz-file  { font-family:var(--mono); font-size:11px; color:var(--accent); margin-top:4px; }
+        #file-input { display:none; }
+
+        .param-row { margin-bottom:10px; }
+        .param-label { display:flex; justify-content:space-between; font-size:11px; font-family:var(--mono); color:var(--dim); margin-bottom:3px; }
+        .param-label span { color:var(--accent); }
+        .param-desc { font-family:var(--mono); font-size:10px; color:var(--dim); opacity:.7; line-height:1.4; margin-bottom:5px; }
+        input[type="range"] { width:100%; height:3px; -webkit-appearance:none; background:var(--border); border-radius:2px; outline:none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); cursor:pointer; box-shadow:0 0 6px var(--accent); }
+
+        .btn { width:100%; padding:9px; font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.08em; border:1px solid; border-radius:4px; cursor:pointer; text-transform:uppercase; transition:all .2s; margin-bottom:6px; }
+        .btn-primary { background:var(--accent); border-color:var(--accent); color:#07090f; }
+        .btn-primary:hover { background:#33ecff; }
+        .btn-primary:disabled { background:transparent; color:var(--dim); border-color:var(--border); cursor:not-allowed; }
+
+        /* ── Résultats coords ── */
+        .coord-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px; }
+        .coord-cell { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:8px 6px; text-align:center; }
+        .cc-label { font-family:var(--mono); font-size:9px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; margin-bottom:3px; }
+        .cc-val   { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--accent); }
+        .cc-unit  { font-family:var(--mono); font-size:9px; color:var(--dim); }
+
+        .conf-bar-wrap { margin-bottom:8px; }
+        .conf-bar-label { display:flex; justify-content:space-between; font-family:var(--mono); font-size:10px; color:var(--dim); margin-bottom:4px; }
+        .conf-bar-track { height:4px; background:var(--border); border-radius:2px; }
+        .conf-bar-fill  { height:4px; border-radius:2px; background:var(--green); transition:width .4s; }
+
+        /* ── Table trajectoire ── */
+        .traj-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:10px; }
+        .traj-table th { color:var(--dim); text-align:left; padding:3px 4px; border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.08em; }
+        .traj-table td { padding:3px 4px; color:var(--text); border-bottom:1px solid rgba(30,45,74,.4); }
+        .traj-table tr:hover td { background:rgba(0,229,255,.04); }
+        .traj-scroll { max-height:200px; overflow-y:auto; }
+        .traj-scroll::-webkit-scrollbar { width:3px; }
+        .traj-scroll::-webkit-scrollbar-thumb { background:var(--border); }
+
+        /* ── Statut DB ── */
+        .db-status { font-family:var(--mono); font-size:11px; border-radius:4px; padding:8px 10px; margin-bottom:8px; }
+        .db-status.ok  { background:rgba(163,230,53,.08); border:1px solid rgba(163,230,53,.3); color:var(--green); }
+        .db-status.err { background:rgba(255,61,110,.08); border:1px solid rgba(255,61,110,.3); color:var(--red); }
+        .db-status.warn{ background:rgba(255,193,7,.08);  border:1px solid rgba(255,193,7,.3);  color:var(--yellow); }
+
+        /* ── Instructions ── */
+        .instr { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:10px; font-family:var(--mono); font-size:10px; color:var(--dim); line-height:1.7; }
+        .instr code { color:var(--accent); background:rgba(0,229,255,.08); padding:1px 4px; border-radius:2px; }
+
+        /* ── Info bar ── */
+        #info-bar { background:var(--bg3); border-top:1px solid var(--border); padding:6px 16px; font-family:var(--mono); font-size:10px; color:var(--dim); flex-shrink:0; min-height:28px; }
+        #info-bar.ok      { color:var(--green); }
+        #info-bar.err     { color:var(--red); }
+        #info-bar.loading { color:var(--accent); }
+
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .spinner { display:inline-block; width:10px; height:10px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:5px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>⬡ Orientation Robot</h1>
+    <div class="nav-links">
+        <a href="/">Navigation 3D</a>
+        <a href="/pathfinding">Trajectoire</a>
+        <a href="/orientation" class="active">Orientation</a>
+    </div>
+</header>
+
+<div class="layout">
+
+    <!-- ── Carte 2D avec position ── -->
+    <div id="canvas-panel">
+        <canvas id="map-canvas"></canvas>
+        <div id="canvas-hint">
+            <p>Uploader une image ou vidéo<br>pour localiser le robot sur la carte.</p>
+        </div>
+        <div id="cursor-coords">—</div>
+    </div>
+
+    <!-- ── Panneau latéral ── -->
+    <div id="side-panel">
+
+        <!-- ① Statut base de données -->
+        <div class="section">
+            <div class="section-title">① Base de données</div>
+            <div id="db-status-box" class="db-status warn">Vérification…</div>
+            <div id="db-instructions" style="display:none">
+                <div class="instr">
+                    <b>① Générer les poses (si pas encore fait) :</b><br>
+                    Re-lancer la reconstruction — elle crée automatiquement <code>poses.json</code> dans ton dossier d'images :<br>
+                    <code style="display:block;margin:4px 0;word-break:break-all">python reconstruction_medium.py --image_folder img_mapanything --output sol_vivant.ply</code><br>
+                    <b>② Lancer le serveur avec --ref-dir :</b><br>
+                    <code style="display:block;margin:4px 0;word-break:break-all">python Navigation/navigation_obstacle.py --model sol_vivant.ply --ref-dir img_mapanything</code><br>
+                    <code>--ref-dir</code> doit pointer vers le dossier d'images utilisé pour la reconstruction (là où se trouve <code>poses.json</code>).
+                </div>
+            </div>
+        </div>
+
+        <!-- ② Upload -->
+        <div class="section">
+            <div class="section-title">② Fichier à localiser</div>
+            <div id="drop-zone">
+                <div class="dz-icon">📷</div>
+                <div class="dz-label">Cliquer ou glisser une image / vidéo<br><small>(JPEG, PNG, MP4, MOV, AVI)</small></div>
+                <div class="dz-file" id="file-name">Aucun fichier</div>
+            </div>
+            <input type="file" id="file-input" accept="image/*,video/*">
+
+            <div class="param-row" id="fps-row" style="display:none">
+                <div class="param-label">Échantillonnage vidéo <span id="lbl-fps">1</span> img/s</div>
+                <div class="param-desc">Nombre de frames analysées par seconde de vidéo.
+                    Réduire pour accélérer le traitement.</div>
+                <input type="range" id="sl-fps" min="0.2" max="5" step="0.2" value="1">
+            </div>
+
+            <button class="btn btn-primary" id="btn-localize" disabled>Localiser</button>
+        </div>
+
+        <!-- ③ Position estimée -->
+        <div class="section">
+            <div class="section-title">③ Position estimée</div>
+            <div class="coord-grid">
+                <div class="coord-cell">
+                    <div class="cc-label">X</div>
+                    <div class="cc-val" id="res-x">–</div>
+                    <div class="cc-unit">unités</div>
+                </div>
+                <div class="coord-cell">
+                    <div class="cc-label">Y</div>
+                    <div class="cc-val" id="res-y">–</div>
+                    <div class="cc-unit">unités</div>
+                </div>
+                <div class="coord-cell">
+                    <div class="cc-label">Z</div>
+                    <div class="cc-val" id="res-z">–</div>
+                    <div class="cc-unit">unités</div>
+                </div>
+            </div>
+            <div class="conf-bar-wrap">
+                <div class="conf-bar-label">
+                    <span>Confiance</span>
+                    <span id="res-conf">–</span>
+                </div>
+                <div class="conf-bar-track">
+                    <div class="conf-bar-fill" id="conf-fill" style="width:0%"></div>
+                </div>
+            </div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--dim)" id="res-match">–</div>
+        </div>
+
+        <!-- ④ Trajectoire (vidéo uniquement) -->
+        <div class="section" id="traj-section" style="display:none">
+            <div class="section-title">④ Trajectoire vidéo</div>
+            <div class="traj-scroll">
+                <table class="traj-table">
+                    <thead><tr><th>t (s)</th><th>X</th><th>Y</th><th>Z</th><th>Conf.</th></tr></thead>
+                    <tbody id="traj-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Légende -->
+        <div class="section">
+            <div class="section-title">Légende carte</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--dim);line-height:2.2">
+                <div>● <span style="color:var(--accent)">Cyan</span> – nuage de points (reconstruction)</div>
+                <div>● <span style="color:var(--green)">Vert</span> – position estimée (image)</div>
+                <div>● <span style="color:var(--orange)">Orange</span> – trajectoire (vidéo)</div>
+                <div>● <span style="color:var(--yellow)">Jaune</span> – point de départ (vidéo)</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="info-bar">Charger un fichier image ou vidéo pour estimer la position du robot.</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  OrientationUI — gestion de la page
+// ─────────────────────────────────────────────────────────────
+
+class OrientationUI {
+    constructor() {
+        this.canvas   = document.getElementById('map-canvas');
+        this.ctx      = this.canvas.getContext('2d');
+        this.mapData  = null;    // XZ projection point cloud
+        this.file     = null;
+        this.isVideo  = false;
+        this.results  = null;    // [{x,y,z,confidence,...}] or single result
+
+        this._resizeCanvas();
+        this._bindEvents();
+
+        window.addEventListener('resize', () => { this._resizeCanvas(); this._draw(); });
+        this._loadMapData();
+        this._checkDbStatus();
+    }
+
+    // ── Chargement carte ─────────────────────────────────────
+
+    async _loadMapData() {
+        try {
+            const r    = await fetch('/api/minimap-data');
+            const data = await r.json();
+            this.mapData = data;
+            this._draw();
+        } catch(e) {
+            console.warn('Impossible de charger la carte XZ :', e);
+        }
+    }
+
+    async _checkDbStatus() {
+        try {
+            const r   = await fetch('/api/localize/status');
+            const s   = await r.json();
+            const box = document.getElementById('db-status-box');
+            const ins = document.getElementById('db-instructions');
+
+            if (s.ready) {
+                box.className = 'db-status ok';
+                box.textContent = `✓ ${s.reference_count} images de référence chargées`;
+                ins.style.display = 'none';
+            } else {
+                box.className = 'db-status err';
+                // Afficher le message d'erreur précis du serveur
+                const msg = s.error || 'Base non prête';
+                if (!s.ref_dir) {
+                    box.innerHTML = '✗ <b>--ref-dir non fourni</b><br>Voir instructions ci-dessous.';
+                } else {
+                    box.innerHTML = `✗ ${msg}`;
+                }
+                ins.style.display = 'block';
+            }
+        } catch(e) {
+            const box = document.getElementById('db-status-box');
+            box.className = 'db-status warn';
+            box.textContent = 'Impossible de contacter le serveur.';
+        }
+    }
+
+    // ── Rendu canvas ─────────────────────────────────────────
+
+    _resizeCanvas() {
+        const p = document.getElementById('canvas-panel');
+        this.canvas.width  = p.clientWidth;
+        this.canvas.height = p.clientHeight;
+    }
+
+    _draw() {
+        const W = this.canvas.width, H = this.canvas.height;
+        const ctx = this.ctx;
+        ctx.fillStyle = '#07090f';
+        ctx.fillRect(0, 0, W, H);
+
+        if (!this.mapData) return;
+
+        const pad  = 40;
+        const bxz  = this.mapData.bounds_xz;
+        const xmin = bxz.min[0], xmax = bxz.max[0];
+        const zmin = bxz.min[1], zmax = bxz.max[1];
+
+        const scaleX = (W - 2*pad) / (xmax - xmin || 1);
+        const scaleZ = (H - 2*pad) / (zmax - zmin || 1);
+        const scale  = Math.min(scaleX, scaleZ);
+        const offX   = pad + (W - 2*pad - (xmax-xmin)*scale) / 2;
+        const offZ   = pad + (H - 2*pad - (zmax-zmin)*scale) / 2;
+
+        // Helper : coordonnées monde → canvas
+        const w2c = (wx, wz) => [
+            offX + (wx - xmin) * scale,
+            offZ + (wz - zmin) * scale,
+        ];
+        this._w2c  = w2c;
+        this._xmin = xmin; this._xmax = xmax;
+        this._zmin = zmin; this._zmax = zmax;
+
+        // Nuage de points (XZ projection)
+        ctx.fillStyle = 'rgba(0,229,255,0.25)';
+        const pts = this.mapData.vertices_xz;
+        const step = Math.max(1, Math.floor(pts.length / 8000));
+        for (let i = 0; i < pts.length; i += step) {
+            const [px, pz] = w2c(pts[i][0], pts[i][1]);
+            ctx.fillRect(px - 0.7, pz - 0.7, 1.4, 1.4);
+        }
+
+        if (!this.results) return;
+
+        if (this.isVideo && Array.isArray(this.results) && this.results.length > 1) {
+            this._drawTrajectory(ctx, w2c);
+        } else {
+            const r = Array.isArray(this.results) ? this.results[0] : this.results;
+            if (r && !r.error) this._drawPositionMarker(ctx, w2c, r.x, r.z, '#a3e635', 10);
+        }
+    }
+
+    _drawTrajectory(ctx, w2c) {
+        const valid = this.results.filter(r => !r.error);
+        if (!valid.length) return;
+
+        // Ligne de trajectoire
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,124,32,0.5)';
+        ctx.lineWidth = 2;
+        valid.forEach((r, i) => {
+            const [px, pz] = w2c(r.x, r.z);
+            i === 0 ? ctx.moveTo(px, pz) : ctx.lineTo(px, pz);
+        });
+        ctx.stroke();
+
+        // Points
+        valid.forEach((r, i) => {
+            const color = i === 0 ? '#ffc107' : (i === valid.length-1 ? '#a3e635' : '#ff7c20');
+            this._drawPositionMarker(ctx, w2c, r.x, r.z, color, i === 0 || i === valid.length-1 ? 9 : 5);
+        });
+    }
+
+    _drawPositionMarker(ctx, w2c, wx, wz, color, r) {
+        const [px, pz] = w2c(wx, wz);
+        // Halo
+        ctx.beginPath();
+        ctx.arc(px, pz, r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = color + '22';
+        ctx.fill();
+        // Point
+        ctx.beginPath();
+        ctx.arc(px, pz, r, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // ── Événements ───────────────────────────────────────────
+
+    _bindEvents() {
+        const dz    = document.getElementById('drop-zone');
+        const input = document.getElementById('file-input');
+        const btn   = document.getElementById('btn-localize');
+        const fpsSl = document.getElementById('sl-fps');
+
+        dz.addEventListener('click', () => input.click());
+        dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+        dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+        dz.addEventListener('drop', e => {
+            e.preventDefault(); dz.classList.remove('drag-over');
+            if (e.dataTransfer.files[0]) this._setFile(e.dataTransfer.files[0]);
+        });
+        input.addEventListener('change', () => { if (input.files[0]) this._setFile(input.files[0]); });
+
+        btn.addEventListener('click', () => this._localize());
+
+        fpsSl.addEventListener('input', () => {
+            document.getElementById('lbl-fps').textContent = fpsSl.value;
+        });
+
+        // Coordonnées curseur sur la carte
+        this.canvas.addEventListener('mousemove', e => {
+            if (!this._w2c || !this.mapData) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const cx   = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+            const cz   = (e.clientY - rect.top)  * (this.canvas.height / rect.height);
+            // Inverse de w2c
+            const pad  = 40;
+            const bxz  = this.mapData.bounds_xz;
+            const xmin = bxz.min[0], xmax = bxz.max[0];
+            const zmin = bxz.min[1], zmax = bxz.max[1];
+            const scaleX = (this.canvas.width  - 2*pad) / (xmax - xmin || 1);
+            const scaleZ = (this.canvas.height - 2*pad) / (zmax - zmin || 1);
+            const scale  = Math.min(scaleX, scaleZ);
+            const offX   = pad + (this.canvas.width  - 2*pad - (xmax-xmin)*scale) / 2;
+            const offZ   = pad + (this.canvas.height - 2*pad - (zmax-zmin)*scale) / 2;
+            const wx = xmin + (cx - offX) / scale;
+            const wz = zmin + (cz - offZ) / scale;
+            document.getElementById('cursor-coords').textContent =
+                `X: ${wx.toFixed(3)}   Z: ${wz.toFixed(3)}`;
+        });
+    }
+
+    _setFile(file) {
+        this.file    = file;
+        this.isVideo = file.type.startsWith('video/');
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('fps-row').style.display = this.isVideo ? 'block' : 'none';
+        document.getElementById('btn-localize').disabled = false;
+        document.getElementById('canvas-hint').classList.add('hidden');
+        this._setStatus('idle', `Fichier sélectionné : ${file.name} (${this.isVideo ? 'vidéo' : 'image'})`);
+    }
+
+    // ── Localisation ─────────────────────────────────────────
+
+    async _localize() {
+        if (!this.file) return;
+
+        document.getElementById('btn-localize').disabled = true;
+        this._setStatus('loading', '<span class="spinner"></span>Localisation en cours…');
+
+        const form = new FormData();
+        form.append('file', this.file);
+
+        try {
+            let url, resp, data;
+
+            if (this.isVideo) {
+                const fps = parseFloat(document.getElementById('sl-fps').value) || 1;
+                url   = `/api/localize/video?sample_fps=${fps}`;
+                resp  = await fetch(url, { method: 'POST', body: form });
+                data  = await resp.json();
+                this._showVideoResults(data);
+            } else {
+                url  = '/api/localize/image';
+                resp = await fetch(url, { method: 'POST', body: form });
+                data = await resp.json();
+                this._showImageResult(data);
+            }
+        } catch(e) {
+            this._setStatus('err', '✗ Erreur réseau : ' + e.message);
+        } finally {
+            document.getElementById('btn-localize').disabled = false;
+        }
+    }
+
+    _showImageResult(data) {
+        if (data.error) {
+            this._setStatus('err', '✗ ' + data.error);
+            return;
+        }
+        this.results = data;
+        this.isVideo = false;
+        document.getElementById('traj-section').style.display = 'none';
+
+        this._updateCoords(data.x, data.y, data.z, data.confidence);
+        document.getElementById('res-match').textContent =
+            `Meilleure ref : ${data.best_match}  (${data.match_count} matchs SIFT)`;
+
+        this._draw();
+        this._setStatus('ok',
+            `✓ Position estimée — X:${data.x}  Y:${data.y}  Z:${data.z}  `
+            + `Confiance:${(data.confidence*100).toFixed(0)}%`);
+    }
+
+    _showVideoResults(results) {
+        if (!Array.isArray(results) || results.length === 0) {
+            this._setStatus('err', '✗ Aucune frame traitée.');
+            return;
+        }
+        this.results = results;
+        this.isVideo = true;
+
+        const valid = results.filter(r => !r.error);
+        if (valid.length === 0) {
+            this._setStatus('err', '✗ Toutes les frames ont échoué : ' + (results[0].error || ''));
+            return;
+        }
+
+        // Dernière position connue dans les coords
+        const last = valid[valid.length - 1];
+        this._updateCoords(last.x, last.y, last.z, last.confidence);
+
+        // Table trajectoire
+        const tbody = document.getElementById('traj-body');
+        tbody.innerHTML = '';
+        results.forEach(r => {
+            const tr = document.createElement('tr');
+            if (r.error) {
+                tr.innerHTML = `<td>${r.time_s ?? '?'}</td><td colspan="4" style="color:var(--red)">${r.error}</td>`;
+            } else {
+                const conf_color = r.confidence > 0.6 ? 'var(--green)' : r.confidence > 0.3 ? 'var(--yellow)' : 'var(--red)';
+                tr.innerHTML =
+                    `<td>${r.time_s}</td><td>${r.x}</td><td>${r.y}</td><td>${r.z}</td>` +
+                    `<td style="color:${conf_color}">${(r.confidence*100).toFixed(0)}%</td>`;
+            }
+            tbody.appendChild(tr);
+        });
+        document.getElementById('traj-section').style.display = 'block';
+
+        this._draw();
+        this._setStatus('ok',
+            `✓ ${valid.length}/${results.length} frames localisées — `
+            + `trajectoire affichée sur la carte`);
+    }
+
+    _updateCoords(x, y, z, confidence) {
+        document.getElementById('res-x').textContent = x.toFixed(3);
+        document.getElementById('res-y').textContent = y.toFixed(3);
+        document.getElementById('res-z').textContent = z.toFixed(3);
+        const pct = Math.round(confidence * 100);
+        document.getElementById('res-conf').textContent = pct + '%';
+        const fill = document.getElementById('conf-fill');
+        fill.style.width = pct + '%';
+        fill.style.background = pct > 60 ? 'var(--green)' : pct > 30 ? 'var(--yellow)' : 'var(--red)';
+    }
+
+    _setStatus(type, html) {
+        const el = document.getElementById('info-bar');
+        el.className = type;
+        el.innerHTML = html;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => { new OrientationUI(); });
+</script>
+</body>
+</html>

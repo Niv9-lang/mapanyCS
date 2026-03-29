@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trajectoire — MapAnything</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:     #07090f;
+            --bg2:    #0d1220;
+            --bg3:    #111827;
+            --border: #1e2d4a;
+            --accent: #00e5ff;
+            --green:  #a3e635;
+            --red:    #ff3d6e;
+            --yellow: #ffc107;
+            --text:   #c8d8f0;
+            --dim:    #5a7090;
+            --mono:   'Space Mono', monospace;
+            --sans:   'Syne', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+        header { display:flex; align-items:center; justify-content:space-between; padding:10px 20px; border-bottom:1px solid var(--border); background:var(--bg2); flex-shrink:0; }
+        header h1 { font-size:14px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+        .nav-links a { color:var(--dim); text-decoration:none; font-size:12px; font-family:var(--mono); margin-left:16px; transition:color .2s; }
+        .nav-links a:hover, .nav-links a.active { color:var(--accent); }
+
+        .layout { flex:1; display:flex; overflow:hidden; }
+
+        #canvas-panel { flex:1; position:relative; background:var(--bg); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        #grid-canvas  { cursor:crosshair; display:block; image-rendering:pixelated; }
+
+        #cursor-coords { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-family:var(--mono); font-size:11px; color:var(--dim); background:rgba(7,9,15,.85); padding:3px 12px; border-radius:12px; border:1px solid var(--border); pointer-events:none; }
+
+        #mode-badge { position:absolute; top:12px; right:12px; font-family:var(--mono); font-size:11px; padding:5px 12px; border-radius:4px; pointer-events:none; display:none; }
+        #mode-badge.a    { display:block; background:rgba(163,230,53,.12); border:1px solid var(--green); color:var(--green); }
+        #mode-badge.b    { display:block; background:rgba(255,61,110,.12);  border:1px solid var(--red);   color:var(--red); }
+        #mode-badge.done { display:block; background:rgba(0,229,255,.06);   border:1px solid var(--border); color:var(--dim); }
+
+        #wait-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(7,9,15,.7); pointer-events:none; }
+        #wait-overlay p { font-family:var(--mono); font-size:13px; color:var(--dim); text-align:center; }
+        #wait-overlay.hidden { display:none; }
+
+        #side-panel { width:280px; flex-shrink:0; background:var(--bg2); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; }
+        #side-panel::-webkit-scrollbar { width:4px; }
+        #side-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+        .section { padding:12px 16px; border-bottom:1px solid var(--border); }
+        .section:last-child { border-bottom:none; }
+        .section-title { font-size:10px; font-family:var(--mono); font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+
+        /* Sol détecté */
+        .floor-box { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:8px 10px; margin-bottom:10px; font-family:var(--mono); font-size:11px; }
+        .floor-box .fb-label { color:var(--dim); margin-bottom:4px; }
+        .floor-box .fb-val   { color:var(--accent); }
+        .floor-box .fb-warn  { color:var(--yellow); margin-top:4px; font-size:10px; }
+
+        /* Inputs numériques pour la bande sol */
+        .range-row { display:flex; gap:6px; margin-bottom:8px; align-items:center; }
+        .range-row label { font-family:var(--mono); font-size:10px; color:var(--dim); width:60px; flex-shrink:0; }
+        .range-row input[type="number"] { flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:11px; padding:4px 8px; border-radius:4px; outline:none; }
+        .range-row input[type="number"]:focus { border-color:var(--accent); }
+
+        .param-row { margin-bottom:10px; }
+        .param-label { display:flex; justify-content:space-between; font-size:11px; font-family:var(--mono); color:var(--dim); margin-bottom:3px; }
+        .param-label span { color:var(--accent); }
+        .param-desc { font-family:var(--mono); font-size:10px; color:var(--dim); opacity:.7; line-height:1.4; margin-bottom:5px; }
+
+        input[type="range"] { width:100%; height:3px; -webkit-appearance:none; background:var(--border); border-radius:2px; outline:none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); cursor:pointer; box-shadow:0 0 6px var(--accent); }
+
+        .btn { width:100%; padding:9px; font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.08em; border:1px solid; border-radius:4px; cursor:pointer; text-transform:uppercase; transition:all .2s; margin-bottom:6px; }
+        .btn-primary { background:var(--accent); border-color:var(--accent); color:#07090f; }
+        .btn-primary:hover { background:#33ecff; }
+        .btn-primary:disabled { background:transparent; color:var(--dim); border-color:var(--border); cursor:not-allowed; }
+        .btn-ghost { background:transparent; border-color:var(--border); color:var(--dim); }
+        .btn-ghost:hover { border-color:var(--red); color:var(--red); }
+        .btn-primary.stale { background:transparent; border-color:var(--yellow); color:var(--yellow); animation:pulse-stale 1.4s ease-in-out infinite; }
+        @keyframes pulse-stale { 0%,100%{box-shadow:0 0 0 0 rgba(255,193,7,.4)} 50%{box-shadow:0 0 0 5px rgba(255,193,7,0)} }
+        .btn-sm { padding:5px 10px; font-size:10px; width:auto; margin-bottom:0; }
+
+        .pt-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-family:var(--mono); font-size:11px; }
+        .pt-dot  { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+        .dot-a   { background:var(--green); box-shadow:0 0 5px var(--green); }
+        .dot-b   { background:var(--red);   box-shadow:0 0 5px var(--red); }
+        .pt-val  { flex:1; color:var(--text); }
+        .pt-val.empty { color:var(--dim); }
+
+        .res-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+        .res-cell { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:8px; }
+        .rl { font-family:var(--mono); font-size:9px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; margin-bottom:2px; }
+        .rv { font-family:var(--mono); font-size:14px; font-weight:700; color:var(--accent); }
+        .ru { font-size:10px; color:var(--dim); }
+
+        .legend { display:flex; flex-direction:column; gap:5px; }
+        .leg { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--dim); }
+        .leg-sw { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+
+        #info-bar { background:var(--bg3); border-top:1px solid var(--border); padding:6px 16px; font-family:var(--mono); font-size:10px; color:var(--dim); flex-shrink:0; min-height:28px; }
+        #info-bar.ok      { color:var(--green); }
+        #info-bar.err     { color:var(--red); }
+        #info-bar.loading { color:var(--accent); }
+
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .spinner { display:inline-block; width:10px; height:10px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:5px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>⬡ Trajectoire A→B</h1>
+    <div class="nav-links">
+        <a href="/">Navigation 3D</a>
+        <a href="/minimap-distance">Distances</a>
+        <a href="/pathfinding" class="active">Trajectoire</a>
+    </div>
+</header>
+
+<div class="layout">
+
+    <div id="canvas-panel">
+        <canvas id="grid-canvas"></canvas>
+        <div id="wait-overlay">
+            <p>Configurer les paramètres<br>puis cliquer sur <b style="color:var(--accent)">GÉNÉRER LA CARTE</b></p>
+        </div>
+        <div id="mode-badge"></div>
+        <div id="cursor-coords">—</div>
+    </div>
+
+    <div id="side-panel">
+
+        <!-- ① Paramètres -->
+        <div class="section">
+            <div class="section-title">① Paramètres</div>
+
+            <!-- Sol détecté automatiquement -->
+            <div class="floor-box">
+                <div class="fb-label">Sol détecté (coordonnées PLY brutes)</div>
+                <div class="fb-val" id="floor-detected">Chargement…</div>
+                <div class="fb-warn" id="floor-warn"></div>
+            </div>
+
+            <!-- Ajustement manuel de la bande sol -->
+            <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px">
+                Corriger la bande sol si nécessaire :
+            </div>
+            <div class="param-desc" style="margin-bottom:6px">
+                Coordonnées Y brutes du fichier PLY délimitant la surface du sol.
+                Modifiez si la détection auto est incorrecte (sol trop haut/bas).
+            </div>
+            <div class="range-row">
+                <label>Y sol min</label>
+                <input type="number" id="inp-fy-min" step="0.01" placeholder="auto">
+            </div>
+            <div class="range-row">
+                <label>Y sol max</label>
+                <input type="number" id="inp-fy-max" step="0.01" placeholder="auto">
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+                <button class="btn btn-ghost btn-sm" id="btn-reset-floor">Remettre auto</button>
+            </div>
+
+            <div class="param-row">
+                <div class="param-label">Résolution grille <span id="lbl-gs">256</span> cellules</div>
+                <div class="param-desc">Nombre de cellules par côté de la grille 2D (N×N).
+                    Plus élevé = contours plus fins mais calcul plus long.
+                    Recommandé : 256 pour un bon compromis.</div>
+                <input type="range" id="sl-gs" min="64" max="512" step="64" value="256">
+            </div>
+
+            <div class="param-row">
+                <div class="param-label">Hauteur min obstacle <span id="lbl-minh">—</span></div>
+                <div class="param-desc">Hauteur minimale au-dessus du sol (en unités modèle, généralement mètres)
+                    pour qu'un objet soit considéré comme un obstacle.
+                    Augmenter pour ignorer les petites irrégularités du sol.</div>
+                <input type="range" id="sl-minh" min="1" max="30" step="1" value="5">
+            </div>
+
+            <div class="param-row">
+                <div class="param-label">Hauteur max obstacle <span id="lbl-maxh">—</span></div>
+                <div class="param-desc">Hauteur maximale prise en compte (en unités modèle).
+                    Les points plus hauts (plafond, luminaires) sont ignorés.
+                    Réduire si le plafond est détecté comme obstacle.</div>
+                <input type="range" id="sl-maxh" min="10" max="150" step="5" value="80">
+            </div>
+
+            <div class="param-row">
+                <div class="param-label">Rayon robot <span id="lbl-rad">2</span> cellules</div>
+                <div class="param-desc">Marge de sécurité gonflée autour de chaque obstacle (en cellules).
+                    1 cellule ≈ taille_modèle / résolution.
+                    Augmenter pour éloigner le chemin des murs.</div>
+                <input type="range" id="sl-rad" min="0" max="15" step="1" value="2">
+            </div>
+
+            <button class="btn btn-primary" id="btn-gen">Générer la carte</button>
+        </div>
+
+        <!-- ② Points -->
+        <div class="section">
+            <div class="section-title">② Placer les points</div>
+            <div class="pt-row">
+                <div class="pt-dot dot-a"></div>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--dim);width:14px">A</span>
+                <div class="pt-val empty" id="pt-a">—</div>
+            </div>
+            <div class="pt-row">
+                <div class="pt-dot dot-b"></div>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--dim);width:14px">B</span>
+                <div class="pt-val empty" id="pt-b">—</div>
+            </div>
+        </div>
+
+        <!-- ③ Calcul -->
+        <div class="section">
+            <div class="section-title">③ Trajectoire</div>
+            <div class="param-row" style="margin-bottom:8px">
+                <div class="param-label">Échelle <span id="lbl-scale">100</span> cm / unité</div>
+                <div class="param-desc">Facteur de conversion pour la distance affichée.
+                    Si le PLY est en mètres (reconstruction typique), laisser 100.
+                    Ajuster si la reconstruction est dans une autre unité.</div>
+                <input type="range" id="sl-scale" min="1" max="500" step="1" value="100">
+            </div>
+            <button class="btn btn-primary" id="btn-path" disabled>Calculer A → B</button>
+            <button class="btn btn-ghost"   id="btn-clear">Effacer les points</button>
+        </div>
+
+        <!-- Résultats -->
+        <div class="section">
+            <div class="section-title">Résultats</div>
+            <div class="res-grid">
+                <div class="res-cell"><div class="rl">Distance</div><div class="rv" id="res-len">–</div><div class="ru" id="res-unit">–</div></div>
+                <div class="res-cell"><div class="rl">Waypoints</div><div class="rv" id="res-wp">–</div></div>
+                <div class="res-cell"><div class="rl">% obstacles</div><div class="rv" id="res-pct">–</div></div>
+                <div class="res-cell"><div class="rl">Libres</div><div class="rv" id="res-free">–</div></div>
+            </div>
+        </div>
+
+        <!-- Légende -->
+        <div class="section">
+            <div class="section-title">Légende</div>
+            <div class="legend">
+                <div class="leg"><div class="leg-sw" style="background:#070a10;border:1px solid #1e2d4a"></div>Hors scan</div>
+                <div class="leg"><div class="leg-sw" style="background:#0a1a30"></div>Sol libre</div>
+                <div class="leg"><div class="leg-sw" style="background:#a02d14"></div>Obstacle / marge robot</div>
+                <div class="leg"><div class="leg-sw" style="background:var(--yellow)"></div>Trajectoire</div>
+                <div class="leg"><div class="leg-sw" style="background:var(--green);border-radius:50%"></div>Départ A</div>
+                <div class="leg"><div class="leg-sw" style="background:var(--red);border-radius:50%"></div>Arrivée B</div>
+            </div>
+        </div>
+
+        <!-- Contrôles -->
+        <div class="section">
+            <div class="section-title">Contrôles carte</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--dim);line-height:2">
+                <div>Clic gauche → A puis B</div>
+                <div>Clic droit + glisser → pan</div>
+                <div>Molette → zoom</div>
+                <div>R → réinitialiser vue</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="info-bar">Configurer les paramètres puis générer la carte.</div>
+
+<script src="{{ url_for('static', filename='js/pathfinding.js') }}"></script>
+</body>
+</html>

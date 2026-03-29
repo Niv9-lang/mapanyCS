@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navigation 3D - MapAnything</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Conteneur principal 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Interface HUD -->
+    <div id="hud">
+        <!-- En-tête -->
+        <div id="header">
+            <h1>🗺️ Navigation 3D</h1>
+            <span id="model-name"></span>
+        </div>
+
+        <!-- Position XYZ (mise à jour en temps réel) -->
+        <div id="position-panel">
+            <h3>📍 Ma position</h3>
+            <div class="position-row">
+                <span class="axis-label">X</span>
+                <span id="pos-x" class="axis-value">0.00</span>
+            </div>
+            <div class="position-row">
+                <span class="axis-label">Y</span>
+                <span id="pos-y" class="axis-value">0.00</span>
+            </div>
+            <div class="position-row">
+                <span class="axis-label">Z</span>
+                <span id="pos-z" class="axis-value">0.00</span>
+            </div>
+        </div>
+
+        <!-- Stats Performance -->
+        <div id="stats">
+            <div class="stat-item">
+                <span class="label">FPS:</span>
+                <span id="fps" class="value">60</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">Zoom:</span>
+                <span id="zoom" class="value">1.0x</span>
+            </div>
+        </div>
+
+        <!-- Minimap type Google Maps (pan + zoom) -->
+        <div id="minimap-container">
+            <div id="minimap-toolbar">
+                <button id="minimap-view-xz" title="Vue de dessus (XZ)">Haut</button>
+                <button id="minimap-view-xy" title="Vue de face (XY)">Face</button>
+                <button id="minimap-view-yz" title="Vue de côté (YZ)">Côté</button>
+                <button id="minimap-reset" title="Réinitialiser la vue">↺</button>
+            </div>
+            <div id="minimap-wrapper">
+                <canvas id="minimap" width="350" height="350"></canvas>
+            </div>
+            <div id="minimap-legend">Déplacer: glisser • Zoom: molette • Point rouge = vous</div>
+            <div id="minimap-coords-label">Coordonnées curseur</div>
+            <div id="minimap-coords">—</div>    
+        </div>
+
+        <!-- Contrôles -->
+        <div id="controls">
+            <div class="control-group">
+                <h3>⌨️ Contrôles</h3>
+                <div class="control-item">
+                    <kbd>Clic droit</kbd> + Mouvement = Rotation
+                </div>
+                <div class="control-item">
+                    <kbd>Molette</kbd> = Zoom
+                </div>
+                <div class="control-item">
+                    <kbd>Clic central</kbd> + Mouvement = Panoramique
+                </div>
+                <div class="control-item">
+                    <kbd>R</kbd> = Réinitialiser vue
+                </div>
+                <div class="control-item">
+                    <kbd>M</kbd> = Afficher/Masquer minimap
+                </div>
+                <div class="control-item">
+                    <kbd>P</kbd> = Capture d'écran
+                </div>
+                <div class="control-item">
+                    <kbd>H</kbd> = Aide
+                </div>
+            </div>
+        </div>
+
+        <!-- Boutons d'action -->
+        <div id="action-buttons">
+            <button id="btn-reset" title="Réinitialiser la vue (R)">↻ Réinitialiser</button>
+            <button id="btn-screenshot" title="Prendre une capture (P)">Capture</button>
+            <button id="btn-fullscreen" title="Plein écran (F)">⛶ Plein écran</button>
+            <button id="btn-help" title="Aide (H)">? Aide</button>
+        </div>
+
+        <!-- Info 3D -->
+        <div id="info-3d">
+            <div class="info-section">
+                <h4>Informations 3D</h4>
+                <div id="info-content">Chargement...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boîte de dialogue Aide -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Aide - Navigation 3D</h2>
+            <div class="help-section">
+                <h3>🖱️ Contrôles Souris</h3>
+                <ul>
+                    <li><strong>Clic droit + Glisser:</strong> Rotation de la vue</li>
+                    <li><strong>Molette:</strong> Zoom avant/arrière</li>
+                    <li><strong>Clic central + Glisser:</strong> Panoramique</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>Position XYZ</h3>
+                <p>Votre position (X, Y, Z) est affichée en temps réel dans le panneau à gauche et mise à jour immédiatement lors de vos déplacements.</p>
+            </div>
+            <div class="help-section">
+                <h3>🗺️ Minimap (style Google Maps)</h3>
+                <ul>
+                    <li><strong>Haut / Face / Côté:</strong> Changer la vue (XZ, XY, YZ)</li>
+                    <li><strong>Glisser:</strong> Déplacer la carte</li>
+                    <li><strong>Molette:</strong> Zoom avant/arrière</li>
+                    <li><strong>Point rouge:</strong> Votre position actuelle</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>⌨️ Touches</h3>
+                <ul>
+                    <li><strong>R:</strong> Réinitialiser la vue</li>
+                    <li><strong>M:</strong> Afficher/Masquer la minimap</li>
+                    <li><strong>P:</strong> Capture d'écran</li>
+                    <li><strong>F:</strong> Plein écran</li>
+                    <li><strong>H:</strong> Afficher cette aide</li>
+                </ul>
+            </div>
+            <button onclick="document.getElementById('help-modal').classList.add('hidden')">Fermer</button>
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
+    <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
+
+</body>
+</html>
