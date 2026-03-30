@@ -52,29 +52,14 @@ pip install torch torchvision torchaudio
 ### Générer la reconstruction
 
 ```bash
-# Depuis le dossier navigation/ avec images relatives
+
 python reconstruction_medium.py \
     --image_folder ../sol_vivant \
     --output sol_vivant.ply
-
-# Ou avec chemin absolu
-python reconstruction_medium.py \
-    --image_folder /chemin/vers/vos/images \
-    --output_glb resultat.ply
-```
-
-**Options disponibles:**
-```bash
-python run_reconstruction.py --help
-
---image_folder      Dossier contenant les images (REQUIS)
---output_glb        Fichier de sortie (défaut: reconstruction.glb)
---model {apache,cc-by-nc}  Modèle à utiliser (défaut: apache)
---device {cuda,cpu} Processeur (défaut: auto)
 ```
 
 ### Résultat
-Un fichier `reconstruction.glb` ou `salle_LC.ply` est créé
+Un fichier `salle_LC.ply` est créé
 
 **Alternative PLY (nuage de points, meilleure qualité) :**
 ```bash
@@ -92,14 +77,6 @@ python reconstruction_medium.py --image_folder ../img_mapanything --output ma_sa
 pip install flask trimesh
 ```
 
-### Lancer l'application
-
-**Option A : Utiliser le script bash (recommandé)**
-```bash
-cd map-anything/navigation
-chmod +x run_navigation.sh
-./run_navigation.sh resultat.glb
-```
 
 **Option B : Commande Python directe**
 ```bash
@@ -114,8 +91,88 @@ python navigation_obstacle.py --model ../sol_vivant.ply --host 127.0.0.1 --port 
 #######################################################################################
 python reconstruction_medium.py --image_folder ../img_mapanything3 --output salle_vivant_2.ply
 
+
 python Navigation/navigation_obstacle.py --model salle_vivant_2.ply --ref-dir ../img_mapanything3
+# le ref dir permet de choisir un dossier de référence pour la fonction de GPS (déterminer sa position à partir d'une image dans la salle)
+
+python Navigation/navigation_obstacle.py --model salle_vivant_2.ply --ref-dir ../4E_CS
+```
+
+---
+
+## Étape 2 : Liste des fonctionnalités disponibles
+
+http://127.0.0.1:5000/ : Navigation dans le modèle 3D avec la souris
+
+http://127.0.0.1:5000/minimap-distance : mesure de la distance entre deux points dans le modèle 3D
+
+http://127.0.0.1:5000/pathfinding : trajectoires entre deux points en tenant compte des obstacles
 
 
+## Étape 3 : Annotation des Salles de Classe
 
+Cette fonctionnalité permet d'annoter des salles sur la carte 2D (minimap), d'afficher
+une bannière de proximité et de se téléporter instantanément dans une salle via une barre
+de recherche.
 
+### Configurer `salles.json`
+
+Créez ou éditez le fichier `salles.json` à la racine du projet (`map-anything/salles.json`) :
+
+```json
+{
+  "proximite_seuil": 2.0,
+  "salles": [
+    {
+      "id": "101",
+      "nom": "Salle 101",
+      "x": 1.23,
+      "y": 0.0,
+      "z": -2.45,
+      "description": "Salle de cours - Rez-de-chaussée"
+    },
+    {
+      "id": "102",
+      "nom": "Salle 102",
+      "x": 3.10,
+      "y": 0.0,
+      "z": -2.45,
+      "description": "Laboratoire"
+    }
+  ]
+}
+```
+
+**Champs :**
+- `proximite_seuil` : distance (en unités 3D) à partir de laquelle la bannière de proximité s'affiche
+- `id` : identifiant court affiché sur la minimap (ex. `"101"`)
+- `nom` : nom complet affiché dans la barre de recherche et la bannière
+- `x`, `y`, `z` : coordonnées 3D de la salle — lire les valeurs affichées dans le panneau **Ma position** de l'explorateur en naviguant jusqu'à la porte de chaque salle
+- `description` : texte libre optionnel (affiché dans les résultats de recherche et la bannière)
+
+### Trouver les coordonnées d'une salle
+
+1. Lancer le serveur et ouvrir `http://127.0.0.1:5000`
+2. Naviguer dans la vue 3D jusqu'à la porte de la salle souhaitée
+3. Lire les coordonnées X / Y / Z dans le panneau **Ma position** (coin supérieur gauche)
+4. Copier ces valeurs dans `salles.json`
+5. Recharger la page (`F5`) — les annotations apparaissent immédiatement
+
+### Lancer le serveur avec les salles
+
+# Combiné avec la localisation visuelle
+```
+python Navigation/navigation_obstacle.py --model salle_LC.ply \
+    --ref-dir ../salle_directory \
+    --salles salles.json
+```
+
+### Fonctionnalités disponibles
+
+| Fonctionnalité | Description |
+|---|---|
+| **Étiquettes minimap** | Chaque salle affichée en bleu sur la carte 2D ; devient orange à proximité |
+| **Bannière de proximité** | S'affiche en bas de l'écran quand la caméra est à ≤ `proximite_seuil` unités d'une salle |
+| **Barre de recherche** | En haut de l'écran — taper un numéro ou un nom, cliquer pour se téléporter |
+| **Touche `S`** | Raccourci clavier pour activer la barre de recherche |
+| **Téléportation** | La caméra se déplace instantanément devant la salle sélectionnée |
