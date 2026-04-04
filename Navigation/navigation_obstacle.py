@@ -16,14 +16,14 @@ from flask import Flask, render_template, send_file, jsonify, request
 try:
     import trimesh
 except ImportError:
-    print("⚠️  trimesh non installé : pip install trimesh")
+    print("trimesh non installé : pip install trimesh")
     trimesh = None
 
 try:
     from localization import VisualLocalizer
 except ImportError:
     VisualLocalizer = None
-    print("⚠️  localization.py introuvable")
+    print("localization.py introuvable")
 
 
 class ModelNavigator:
@@ -83,82 +83,79 @@ class ModelNavigator:
 
     def _analyze_y(self):
         """
-        Analyse la distribution Y pour détecter le sol automatiquement.
-        
-        Le viewer Three.js applique rotation.x = PI sur le modèle PLY,
-        ce qui transforme : Y_viewer = -Y_ply, Z_viewer = -Z_ply.
-        Les coordonnées stockées ici sont les coordonnées PLY BRUTES.
-        
-        Le sol est la surface horizontale la plus dense dans l'histogramme Y.
-        Dans un PLY brut (avant rotation Three.js) le sol peut être au max
-        ou au min de Y selon l'orientation du scan.
+        Détecte le sol automatiquement par analyse des extrêmes Y.
+
+        Principe : les photos étant prises par un humain debout, MASt3r place
+        toujours le sol et le plafond aux abscisses Y les plus extrêmes du nuage.
+        Les 4 murs créent des pics intermédiaires dans l'histogramme Y.
+        On cherche donc le pic dominant dans les 15 % inférieurs et supérieurs de
+        l'étendue Y, et on prend le plus dense comme sol.
+
+        L'étendue réelle du sol (pente incluse) est déterminée en isolant
+        le cluster de points autour du centre détecté (±10 % de y_range).
+
+        Coordonnées PLY brutes (avant rotation Three.js).
+        Le viewer applique rotation.x = PI + recentrage :
+            Y_viewer = Y_ply_center - Y_ply
         """
         y = self.vertices[:, 1]
         ymin, ymax = float(y.min()), float(y.max())
         y_range = ymax - ymin
 
-        # Histogramme fin pour trouver les surfaces planes (pics de densité)
+        # Histogramme fin + lissage
         hist, bins = np.histogram(y, bins=300)
         centers = (bins[:-1] + bins[1:]) / 2
-
-        # Lissage léger
-        k = np.ones(5) / 5
+        k = np.ones(7) / 7
         hist_s = np.convolve(hist.astype(float), k, mode='same')
 
-        # Le sol ET le plafond sont les deux pics les plus denses
-        # On les identifie en cherchant les deux maxima séparés d'au moins 30% de y_range
-        sorted_peaks = np.argsort(hist_s)[::-1]
-        peaks = []
-        for idx in sorted_peaks:
-            if not peaks:
-                peaks.append(idx)
-            else:
-                # Assez éloigné des pics déjà trouvés
-                if all(abs(centers[idx] - centers[p]) > y_range * 0.25 for p in peaks):
-                    peaks.append(idx)
-            if len(peaks) == 2:
-                break
+        # ── Pic dominant dans les 15 % inférieurs (candidat sol ou plafond bas) ──
+        margin = y_range * 0.15
+        mask_bot = centers <= ymin + margin
+        mask_top = centers >= ymax - margin
 
-        peak_y = sorted([centers[p] for p in peaks])
-
-        # Le sol est le pic le moins élevé (Y min) en coordonnées PLY brutes
-        # SAUF si le scan est orienté tête en bas, auquel que le sol est au Y max.
-        # On détecte l'orientation en regardant où se trouve la majorité des points
-        # dans le premier tiers vs dernier tiers de y_range.
-        lower_third = y_range / 3
-        n_low  = int((y < ymin + lower_third).sum())
-        n_high = int((y > ymax - lower_third).sum())
-
-        if len(peak_y) == 2:
-            # Deux surfaces planes détectées (sol + plafond)
-            if n_low >= n_high:
-                # Sol au bas de Y (orientation normale)
-                floor_y_center = peak_y[0]
-                ceil_y_center  = peak_y[1]
-            else:
-                # Sol au haut de Y (Y inversé par rapport au viewer)
-                floor_y_center = peak_y[1]
-                ceil_y_center  = peak_y[0]
+        if mask_bot.any():
+            idx_bot      = int(np.argmax(hist_s[mask_bot]))
+            bot_center   = float(centers[mask_bot][idx_bot])
+            bot_density  = float(hist_s[mask_bot][idx_bot])
         else:
-            # Un seul pic trouvé : prendre le Y min ou max selon densité
-            floor_y_center = float(centers[sorted_peaks[0]])
-            ceil_y_center  = None
+            bot_center, bot_density = ymin, 0.0
 
-        # Largeur de la bande sol : ±5% de y_range autour du centre détecté
-        band_half = y_range * 0.05
-        self.floor_y_min = float(floor_y_center - band_half)
-        self.floor_y_max = float(floor_y_center + band_half)
-        self.floor_y_center = float(floor_y_center)
+        if mask_top.any():
+            idx_top      = int(np.argmax(hist_s[mask_top]))
+            top_center   = float(centers[mask_top][idx_top])
+            top_density  = float(hist_s[mask_top][idx_top])
+        else:
+            top_center, top_density = ymax, 0.0
+
+        # ── Le sol est l'extrême le plus dense ──
+        if bot_density >= top_density:
+            floor_y_center = bot_center
+            ceil_y_center  = top_center
+        else:
+            floor_y_center = top_center
+            ceil_y_center  = bot_center
+
+        # ── Étendue réelle du sol : cluster ±10 % de y_range autour du centre ──
+        # Cela capture la pente du sol sans fixer une bande arbitraire.
+        cluster_half = y_range * 0.10
+        floor_pts = y[(y >= floor_y_center - cluster_half) & (y <= floor_y_center + cluster_half)]
+        if len(floor_pts) >= 10:
+            self.floor_y_min = float(floor_pts.min())
+            self.floor_y_max = float(floor_pts.max())
+        else:
+            self.floor_y_min = floor_y_center - y_range * 0.05
+            self.floor_y_max = floor_y_center + y_range * 0.05
+
+        self.floor_y_center = floor_y_center
         self.ceil_y_center  = ceil_y_center
-        self.y_range        = float(y_range)
+        self.y_range        = y_range
 
         n_floor = int(((y >= self.floor_y_min) & (y <= self.floor_y_max)).sum())
         print(f"  Y brut PLY : min={ymin:.4f}  max={ymax:.4f}  étendue={y_range:.4f}")
         print(f"  Sol détecté : centre={floor_y_center:.4f}  "
               f"bande=[{self.floor_y_min:.4f}, {self.floor_y_max:.4f}]  "
               f"points sol={n_floor:,}")
-        if ceil_y_center:
-            print(f"  Plafond détecté : centre={ceil_y_center:.4f}")
+        print(f"  Plafond : centre={ceil_y_center:.4f}")
 
     # ──────────────────────────────────────────────
     #  Infos scène / caméra / minimap
@@ -199,14 +196,26 @@ class ModelNavigator:
     def get_floor_info(self) -> Dict:
         """Retourne les infos sur le sol détecté pour le frontend."""
         y = self.vertices[:, 1]
+        y_ply_min    = float(y.min())
+        y_ply_max    = float(y.max())
+        y_ply_center = (y_ply_min + y_ply_max) / 2.0
+        # Conversion vers coordonnées viewer Three.js :
+        #   Y_viewer = Y_ply_center - Y_ply
+        # Attention : l'ordre min/max s'inverse à cause de la négation.
+        floor_min_v = round(y_ply_center - self.floor_y_max, 6)
+        floor_max_v = round(y_ply_center - self.floor_y_min, 6)
         return {
-            "y_min":          float(y.min()),
-            "y_max":          float(y.max()),
-            "y_range":        float(self.y_range),
-            "floor_y_center": float(self.floor_y_center),
-            "floor_y_min":    float(self.floor_y_min),
-            "floor_y_max":    float(self.floor_y_max),
-            "ceil_y_center":  float(self.ceil_y_center) if self.ceil_y_center else None,
+            "y_min":               y_ply_min,
+            "y_max":               y_ply_max,
+            "y_range":             float(self.y_range),
+            "y_ply_center":        y_ply_center,
+            "floor_y_center":      float(self.floor_y_center),
+            "floor_y_min":         float(self.floor_y_min),
+            "floor_y_max":         float(self.floor_y_max),
+            # Coordonnées telles que vues dans le viewer (rotation.x=PI + centrage)
+            "floor_y_min_viewer":  floor_min_v,
+            "floor_y_max_viewer":  floor_max_v,
+            "ceil_y_center":       float(self.ceil_y_center) if self.ceil_y_center else None,
         }
 
     # ──────────────────────────────────────────────
@@ -279,14 +288,13 @@ class ModelNavigator:
 
         # ── Carte de hauteur locale du sol (gestion des sols en pente) ──
         #
-        #  Au lieu d'une bande Y globale fixe, on calcule pour chaque cellule
-        #  de la grille la hauteur du sol LOCAL en prenant le min (ou max) Y
-        #  des points présents dans une bande ±30 % de y_range autour du centre
-        #  de sol détecté. Cela permet à l'algorithme de suivre automatiquement
-        #  un sol pentu sans réglage manuel.
+        #  Pour chaque cellule XZ de la grille, on calcule la hauteur du sol
+        #  local à partir des points dans une bande centrée sur [fy_min, fy_max].
+        #  La bande est proportionnelle à la largeur de la bande sol, ce qui la
+        #  rend sensible aux corrections manuelles tout en couvrant les pentes.
         local_floor = self._compute_local_floor_heightmap(
             rows, cols, y, gs,
-            obstacles_above_floor, fy_center, self.y_range,
+            obstacles_above_floor, fy_min, fy_max,
         )
 
         # ── Hauteur de chaque point au-dessus du sol local ──
@@ -415,18 +423,19 @@ class ModelNavigator:
         y: np.ndarray,
         gs: int,
         obstacles_above: bool,
-        fy_center: float,
-        y_range: float,
+        fy_min: float,
+        fy_max: float,
     ) -> np.ndarray:
         """
         Carte de hauteur locale du sol, cellule par cellule.
 
         Pour chaque cellule de la grille on cherche la hauteur du sol
-        local parmi les points tombant dans une bande ±30 % de y_range
-        autour du centre de sol détecté globalement.
-        Cela permet de gérer les sols en pente : le Y du sol peut varier
-        continûment d'une cellule à l'autre sans que l'algorithme ne
-        se trompe sur ce qui est "sol" ou "obstacle".
+        local parmi les points tombant dans une bande de recherche centrée
+        sur la bande sol [fy_min, fy_max].
+
+        La bande de recherche = max(3 × largeur bande sol, 2 % de y_range).
+        Cela la rend sensible aux corrections manuelles (override), tout en
+        restant assez large pour couvrir les sols en pente.
 
         Paramètres
         ----------
@@ -434,8 +443,7 @@ class ModelNavigator:
         y          : coordonnée Y brute de chaque point
         gs         : taille de la grille
         obstacles_above : True si les obstacles ont Y > sol, False si Y < sol
-        fy_center  : centre Y du sol détecté globalement
-        y_range    : étendue totale Y du nuage de points
+        fy_min, fy_max  : bande sol utilisée (auto-détectée ou override)
 
         Retourne
         --------
@@ -443,9 +451,12 @@ class ModelNavigator:
         NaN sur les cellules sans aucun point dans la bande de recherche
         (comblé ensuite par interpolation par voisinage).
         """
-        # Bande de recherche : ±30 % de y_range autour du sol global
-        # (assez large pour couvrir une pente significative)
-        search_half = y_range * 0.30
+        fy_center   = (fy_min + fy_max) / 2
+        band_width  = max(fy_max - fy_min, 1e-6)
+        y_range     = float(y.max() - y.min()) or 1.0
+        # Bande de recherche : assez large pour les sols en pente,
+        # mais proportionnelle à la bande sol pour que l'override ait un effet.
+        search_half = max(band_width * 3.0, y_range * 0.02)
         in_band = (y >= fy_center - search_half) & (y <= fy_center + search_half)
 
         rs = rows[in_band]
@@ -654,7 +665,7 @@ class ModelNavigator:
 #  Flask App
 # ══════════════════════════════════════════════════════════════════
 
-def create_app(model_path: str, ref_dir: Optional[str] = None):
+def create_app(model_path: str, ref_dir: Optional[str] = None, salles_path: Optional[str] = None):
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB max upload
 
@@ -666,8 +677,24 @@ def create_app(model_path: str, ref_dir: Optional[str] = None):
     # Localisation visuelle (optionnelle, requiert --ref-dir)
     localizer = VisualLocalizer(ref_dir) if VisualLocalizer else None
 
+    # Fichier JSON des salles (cherche salles.json à côté du modèle si non spécifié)
+    _salles_path = Path(salles_path) if salles_path else Path(model_path).parent / "salles.json"
+    if not _salles_path.exists():
+        # Chercher aussi à la racine du projet (dossier courant)
+        _salles_path_root = Path("salles.json")
+        if _salles_path_root.exists():
+            _salles_path = _salles_path_root
+
     @app.route("/")
     def index(): return render_template("index.html")
+
+    @app.route("/api/salles")
+    def get_salles():
+        if _salles_path.exists():
+            import json as _json
+            with open(_salles_path, encoding="utf-8") as f:
+                return jsonify(_json.load(f))
+        return jsonify({"proximite_seuil": 2.0, "salles": []})
 
     @app.route("/minimap-distance")
     def minimap_distance(): return render_template("minimap_distance.html")
@@ -705,7 +732,17 @@ def create_app(model_path: str, ref_dir: Optional[str] = None):
         radius   = max(0, min(20, int(request.args.get("robot_radius", 2))))
         fy_min_s = request.args.get("floor_y_min", None)
         fy_max_s = request.args.get("floor_y_max", None)
-        band     = (float(fy_min_s), float(fy_max_s)) if fy_min_s and fy_max_s else None
+        band     = None
+        if fy_min_s and fy_max_s:
+            fmin_v, fmax_v = float(fy_min_s), float(fy_max_s)
+            if request.args.get("viewer_coords", "0") == "1":
+                # Convertir coordonnées viewer → PLY brutes
+                # Y_viewer = Y_ply_center - Y_ply  →  Y_ply = Y_ply_center - Y_viewer
+                # L'ordre min/max s'inverse à cause de la négation.
+                yc   = (nav.vertices[:, 1].min() + nav.vertices[:, 1].max()) / 2.0
+                band = (yc - fmax_v, yc - fmin_v)
+            else:
+                band = (fmin_v, fmax_v)
         return jsonify(nav.compute_occupancy_grid(gs, min_h, max_h, radius, band))
 
     @app.route("/api/pathfind")
@@ -721,7 +758,14 @@ def create_app(model_path: str, ref_dir: Optional[str] = None):
         radius   = max(0, min(20, int(request.args.get("robot_radius", 2))))
         fy_min_s = request.args.get("floor_y_min", None)
         fy_max_s = request.args.get("floor_y_max", None)
-        band     = (float(fy_min_s), float(fy_max_s)) if fy_min_s and fy_max_s else None
+        band     = None
+        if fy_min_s and fy_max_s:
+            fmin_v, fmax_v = float(fy_min_s), float(fy_max_s)
+            if request.args.get("viewer_coords", "0") == "1":
+                yc   = (nav.vertices[:, 1].min() + nav.vertices[:, 1].max()) / 2.0
+                band = (yc - fmax_v, yc - fmin_v)
+            else:
+                band = (fmin_v, fmax_v)
         print(f"\n🗺  A→B : ({ax:.3f},{az:.3f}) → ({bx:.3f},{bz:.3f})")
         return jsonify(nav.find_path(ax, az, bx, bz, gs, min_h, max_h, radius, band))
 
@@ -765,13 +809,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model",   required=True,  help="Chemin vers le fichier PLY ou GLB")
     parser.add_argument("--ref-dir", default=None,   help="Dossier d'images de référence pour la localisation (images.txt ou poses.json)")
+    parser.add_argument("--salles",  default=None,   help="Fichier JSON des salles de classe (défaut: salles.json à côté du modèle)")
     parser.add_argument("--host",    default="127.0.0.1")
     parser.add_argument("--port",    type=int, default=5000)
     parser.add_argument("--debug",   action="store_true")
     args = parser.parse_args()
 
     print("="*60 + "\n🚀  Navigation 3D + Planification + Localisation\n" + "="*60)
-    app = create_app(args.model, args.ref_dir)
+    app = create_app(args.model, args.ref_dir, args.salles)
     if app is None: return 1
 
     print(f"\n  Navigation 3D   → http://{args.host}:{args.port}")

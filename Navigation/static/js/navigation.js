@@ -24,13 +24,18 @@ class SceneNavigator {
         
         this.minimapVisible = true;
         this.lastZoom = 1;
-        
+
         // Minimap type Google Maps : pan, zoom, vues
         this.minimapView = 'xz';  // 'xz' | 'xy' | 'yz'
         this.minimapPan = { x: 0, y: 0 };
         this.minimapZoom = 1;
         this.minimapDrag = { active: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 };
-        
+
+        // Salles de classe
+        this.salles = [];
+        this.sallesProximiteSeuil = 2.0;
+        this._salleProxActuelle = null;
+
         this.init();
     }
 
@@ -40,19 +45,22 @@ class SceneNavigator {
         try {
             // Charger les données de configuration
             await this.loadConfiguration();
-            
+
             // Initialiser Three.js
             this.initThreeJS();
-            
+
             // Charger le modèle GLB
             await this.loadModel();
-            
+
             // Initialiser les contrôles
             this.initControls();
-            
+
             // Initialiser l'interface
             this.initUI();
-            
+
+            // Charger les salles (non bloquant)
+            this.loadSalles();
+
             // Démarrer la boucle de rendu
             this.animate();
             
@@ -450,6 +458,14 @@ class SceneNavigator {
                 event.preventDefault();
                 this.showHelp();
                 break;
+            case 's': {
+                const input = document.getElementById('salles-input');
+                if (input && document.activeElement !== input) {
+                    event.preventDefault();
+                    input.focus();
+                }
+                break;
+            }
         }
     }
 
@@ -534,6 +550,45 @@ class SceneNavigator {
             }
         }
         
+        // Marqueurs de salles
+        if (this.salles && this.salles.length > 0) {
+            ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (const s of this.salles) {
+                let s2d;
+                if (viewKey === 'xz')      s2d = [s.x, s.z];
+                else if (viewKey === 'xy') s2d = [s.x, s.y];
+                else                       s2d = [s.y, s.z];
+
+                const [sx, sy] = worldToScreen(s2d[0], s2d[1]);
+                const label = s.id;
+                const tw = ctx.measureText(label).width + 8;
+                const th = 16;
+
+                // Fond de l'étiquette
+                const isProche = this._salleProxActuelle === s.id;
+                ctx.fillStyle = isProche ? '#ff9900' : '#1a6aff';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                const rx = sx - tw / 2, ry = sy - th / 2;
+                ctx.beginPath();
+                ctx.roundRect ? ctx.roundRect(rx, ry, tw, th, 3) : ctx.rect(rx, ry, tw, th);
+                ctx.fill();
+                ctx.stroke();
+
+                // Texte
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(label, sx, sy);
+
+                // Petit point central
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(sx, sy + th / 2 + 4, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
         // Point rouge = position de l'utilisateur
         const [camSx, camSy] = worldToScreen(cam2d[0], cam2d[1]);
         ctx.fillStyle = '#ff3333';
@@ -620,17 +675,142 @@ class SceneNavigator {
         requestAnimationFrame(() => this.animate());
 
         if (this.controls) {
-            this.controls.update(); // sans argument
+            this.controls.update();
         }
 
         this.updateStats();
         this.updateMinimap();
+        this.updateProximite();
         this.renderer.render(this.scene, this.camera);
     }
 
 
     formatNumber(num) {
         return Math.floor(num).toLocaleString('fr-FR');
+    }
+
+    // ── Salles de classe ─────────────────────────────────────
+
+    async loadSalles() {
+        try {
+            const resp = await fetch('/api/salles');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            this.salles = data.salles || [];
+            this.sallesProximiteSeuil = data.proximite_seuil || 2.0;
+            console.log(`✓ ${this.salles.length} salle(s) chargée(s)`);
+            this.initSallesSearch();
+        } catch (e) {
+            console.warn('Salles non disponibles:', e);
+        }
+    }
+
+    initSallesSearch() {
+        const input = document.getElementById('salles-input');
+        const results = document.getElementById('salles-results');
+        if (!input) return;
+
+        input.addEventListener('input', () => {
+            const q = input.value.trim().toLowerCase();
+            if (!q) { results.classList.add('hidden'); return; }
+
+            const matches = this.salles.filter(s =>
+                s.id.toLowerCase().includes(q) || s.nom.toLowerCase().includes(q)
+            );
+
+            if (matches.length === 0) {
+                results.innerHTML = '<div class="salle-result-empty">Aucune salle trouvée</div>';
+            } else {
+                results.innerHTML = matches.map(s =>
+                    `<div class="salle-result-item" data-id="${s.id}">
+                        <strong>${s.nom}</strong>
+                        ${s.description ? `<span class="salle-desc">${s.description}</span>` : ''}
+                     </div>`
+                ).join('');
+                results.querySelectorAll('.salle-result-item').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const salle = this.salles.find(s => s.id === el.dataset.id);
+                        if (salle) {
+                            this.teleportTo(salle);
+                            input.value = '';
+                            results.classList.add('hidden');
+                        }
+                    });
+                });
+            }
+            results.classList.remove('hidden');
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                input.value = '';
+                results.classList.add('hidden');
+                input.blur();
+            }
+        });
+
+        // Fermer si clic ailleurs
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#salles-search')) {
+                results.classList.add('hidden');
+            }
+        });
+    }
+
+    teleportTo(salle) {
+        if (!this.camera || !this.controls) return;
+        console.log(`📍 Téléportation vers ${salle.nom} (${salle.x}, ${salle.y}, ${salle.z})`);
+
+        // Placer la caméra légèrement en face de la salle (décalage sur Z dans le repère local)
+        const offset = (this.sceneInfo.radius || 1) * 0.15;
+        this.camera.position.set(salle.x, salle.y + offset * 0.5, salle.z + offset);
+        this.controls.target.set(salle.x, salle.y, salle.z);
+        this.controls.update();
+
+        // Afficher temporairement le nom de la salle
+        this._showSalleProximite(salle, true);
+    }
+
+    updateProximite() {
+        if (!this.salles.length || !this.camera) return;
+
+        const pos = this.camera.position;
+        let closest = null;
+        let minDist = Infinity;
+
+        for (const s of this.salles) {
+            const dx = pos.x - s.x, dy = pos.y - s.y, dz = pos.z - s.z;
+            const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            if (d < minDist) { minDist = d; closest = s; }
+        }
+
+        if (closest && minDist <= this.sallesProximiteSeuil) {
+            if (this._salleProxActuelle !== closest.id) {
+                this._salleProxActuelle = closest.id;
+                this._showSalleProximite(closest, false);
+            }
+        } else {
+            if (this._salleProxActuelle !== null) {
+                this._salleProxActuelle = null;
+                const panel = document.getElementById('salle-proximite');
+                if (panel) panel.classList.add('hidden');
+            }
+        }
+    }
+
+    _showSalleProximite(salle, isTemp) {
+        const panel = document.getElementById('salle-proximite');
+        const nomEl = document.getElementById('salle-proximite-nom');
+        if (!panel || !nomEl) return;
+        nomEl.textContent = salle.nom + (salle.description ? ` — ${salle.description}` : '');
+        panel.classList.remove('hidden');
+
+        if (isTemp) {
+            if (this._proxTimeout) clearTimeout(this._proxTimeout);
+            this._proxTimeout = setTimeout(() => {
+                if (this._salleProxActuelle === null) panel.classList.add('hidden');
+            }, 3000);
+        }
     }
 }
 

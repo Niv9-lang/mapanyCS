@@ -510,3 +510,121 @@ button:disabled {
 #controls::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 255, 136, 0.6);
 }
+
+/* ==================== Barre de recherche salles ==================== */
+
+#salles-search {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    width: 280px;
+}
+
+#salles-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.82);
+    border: 2px solid #1a6aff;
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 14px;
+    outline: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 16px rgba(26, 106, 255, 0.35);
+    transition: border-color 0.2s;
+}
+
+#salles-input:focus {
+    border-color: #00ff88;
+    box-shadow: 0 0 16px rgba(0, 255, 136, 0.4);
+}
+
+#salles-input::placeholder {
+    color: #666;
+}
+
+#salles-results {
+    margin-top: 4px;
+    background: rgba(10, 10, 20, 0.95);
+    border: 1px solid #1a6aff;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+}
+
+#salles-results.hidden {
+    display: none;
+}
+
+.salle-result-item {
+    padding: 9px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.salle-result-item:last-child {
+    border-bottom: none;
+}
+
+.salle-result-item:hover {
+    background: rgba(26, 106, 255, 0.25);
+}
+
+.salle-result-item strong {
+    color: #00ff88;
+    font-size: 13px;
+}
+
+.salle-desc {
+    color: #999;
+    font-size: 11px;
+}
+
+.salle-result-empty {
+    padding: 10px 14px;
+    color: #666;
+    font-style: italic;
+    font-size: 13px;
+}
+
+/* ==================== Indicateur de proximité ==================== */
+
+#salle-proximite {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 10, 20, 0.9);
+    border: 2px solid #ff9900;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    color: #ff9900;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px rgba(255, 153, 0, 0.4);
+    z-index: 200;
+    pointer-events: none;
+    animation: fadeInUp 0.3s ease;
+}
+
+#salle-proximite.hidden {
+    display: none;
+}
+
+#salle-proximite-icon {
+    font-size: 18px;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

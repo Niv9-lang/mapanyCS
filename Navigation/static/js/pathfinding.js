@@ -45,18 +45,19 @@ class PathfindingUI {
             this._yRange   = this.floorInfo.y_range || 1.0;
 
             const fi = this.floorInfo;
+            // Afficher les deux systèmes de coordonnées
             document.getElementById('floor-detected').innerHTML =
-                `Sol Y : [<b>${fi.floor_y_min.toFixed(3)}</b>, <b>${fi.floor_y_max.toFixed(3)}</b>]<br>`
-                + `PLY brut : Y∈[${fi.y_min.toFixed(3)}, ${fi.y_max.toFixed(3)}]`;
+                `<span style="color:var(--dim)">Viewer :</span> Y∈[<b>${fi.floor_y_min_viewer.toFixed(3)}</b>, <b>${fi.floor_y_max_viewer.toFixed(3)}</b>]<br>`
+                + `<span style="color:var(--dim)">PLY brut :</span> Y∈[${fi.floor_y_min.toFixed(3)}, ${fi.floor_y_max.toFixed(3)}]`;
 
-            // Pré-remplir les champs manuels avec la valeur détectée
-            document.getElementById('inp-fy-min').value = fi.floor_y_min.toFixed(3);
-            document.getElementById('inp-fy-max').value = fi.floor_y_max.toFixed(3);
+            // Pré-remplir avec les coordonnées VIEWER (ce que l'utilisateur voit)
+            document.getElementById('inp-fy-min').value = fi.floor_y_min_viewer.toFixed(3);
+            document.getElementById('inp-fy-max').value = fi.floor_y_max_viewer.toFixed(3);
 
-            // Avertissement si le sol détecté semble bizarre
             if (fi.ceil_y_center !== null) {
+                const ceil_v = (fi.y_ply_center - fi.ceil_y_center).toFixed(3);
                 document.getElementById('floor-warn').textContent =
-                    `Plafond détecté à Y=${fi.ceil_y_center.toFixed(3)}`;
+                    `Plafond détecté à Y viewer ≈ ${ceil_v}`;
             }
 
             this._updateSliderLabels();
@@ -342,8 +343,8 @@ class PathfindingUI {
         });
         document.getElementById('btn-reset-floor').addEventListener('click',()=>{
             if (this.floorInfo) {
-                document.getElementById('inp-fy-min').value=this.floorInfo.floor_y_min.toFixed(3);
-                document.getElementById('inp-fy-max').value=this.floorInfo.floor_y_max.toFixed(3);
+                document.getElementById('inp-fy-min').value=this.floorInfo.floor_y_min_viewer.toFixed(3);
+                document.getElementById('inp-fy-max').value=this.floorInfo.floor_y_max_viewer.toFixed(3);
             }
         });
     }
@@ -395,7 +396,11 @@ class PathfindingUI {
             max_h:        parseFloat((yr*maxPct/100).toFixed(4)),
             robot_radius: parseInt(document.getElementById('sl-rad').value),
         };
-        if (fyMin!==''&&fyMax!=='') { p.floor_y_min=parseFloat(fyMin); p.floor_y_max=parseFloat(fyMax); }
+        if (fyMin!==''&&fyMax!=='') {
+            p.floor_y_min    = parseFloat(fyMin);
+            p.floor_y_max    = parseFloat(fyMax);
+            p.viewer_coords  = 1;   // les inputs sont en coordonnées viewer
+        }
         return p;
     }
 

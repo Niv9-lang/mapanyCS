@@ -18,6 +18,18 @@
             <span id="model-name"></span>
         </div>
 
+        <!-- Barre de recherche de salles -->
+        <div id="salles-search">
+            <input type="text" id="salles-input" placeholder="🔍 Chercher une salle..." autocomplete="off">
+            <div id="salles-results" class="hidden"></div>
+        </div>
+
+        <!-- Indicateur de proximité (salle proche) -->
+        <div id="salle-proximite" class="hidden">
+            <span id="salle-proximite-icon">🏫</span>
+            <span id="salle-proximite-nom"></span>
+        </div>
+
         <!-- Position XYZ (mise à jour en temps réel) -->
         <div id="position-panel">
             <h3>📍 Ma position</h3>
@@ -88,6 +100,9 @@
                 <div class="control-item">
                     <kbd>H</kbd> = Aide
                 </div>
+                <div class="control-item">
+                    <kbd>S</kbd> = Barre de recherche salles
+                </div>
             </div>
         </div>
 
@@ -141,6 +156,16 @@
                     <li><strong>P:</strong> Capture d'écran</li>
                     <li><strong>F:</strong> Plein écran</li>
                     <li><strong>H:</strong> Afficher cette aide</li>
+                    <li><strong>S:</strong> Activer la barre de recherche de salles</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>🏫 Salles de classe</h3>
+                <ul>
+                    <li><strong>Barre de recherche (haut de l'écran) :</strong> taper un numéro ou un nom pour se téléporter</li>
+                    <li><strong>Minimap :</strong> les salles sont affichées en bleu, en orange si vous êtes à proximité</li>
+                    <li><strong>Bannière orange :</strong> apparaît automatiquement quand vous approchez d'une salle</li>
+                    <li>Les positions sont configurées dans <code>salles.json</code></li>
                 </ul>
             </div>
             <button onclick="document.getElementById('help-modal').classList.add('hidden')">Fermer</button>

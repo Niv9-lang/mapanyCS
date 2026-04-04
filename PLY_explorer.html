@@ -48,6 +48,7 @@
   #hud { position:fixed; bottom:1.4rem; left:1.4rem; display:flex; flex-direction:column; gap:.45rem; z-index:50; pointer-events:none; opacity:0; transition:opacity .5s; }
   #hud.visible { opacity:1; }
   .hud-row { display:flex; align-items:center; gap:.5rem; font-size:.62rem; color:var(--dim); letter-spacing:.07em; }
+  #hud-coords { font-family:'Space Mono',monospace; font-size:.6rem; color:var(--accent); letter-spacing:.05em; margin-top:.3rem; opacity:.85; }
   .key { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:19px; padding:0 4px; background:var(--panel); border:1px solid var(--border); border-radius:4px; color:var(--accent); font-size:.58rem; font-weight:700; }
 
   /* SETTINGS PANEL */
@@ -91,6 +92,53 @@
   #prog-sub { font-size:.65rem; color:var(--dim); letter-spacing:.1em; }
   #prog-bar-track { width:280px; height:3px; background:rgba(255,255,255,.07); border-radius:2px; overflow:hidden; }
   #prog-bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); width:0%; transition:width .15s; }
+
+  /* SALLES */
+  #salles-overlay { position:fixed; inset:0; pointer-events:none; z-index:45; }
+  .salle-label { position:absolute; transform:translate(-50%,-50%); pointer-events:none; display:none; }
+  .salle-bubble {
+    background: rgba(0,60,180,.82);
+    border: 2px solid #4a90ff;
+    border-radius: 5px;
+    padding: .35rem 1.1rem;
+    white-space: nowrap;
+    transition: background .25s, border-color .25s, box-shadow .25s;
+    box-shadow: 0 0 10px rgba(74,144,255,.35);
+  }
+  .salle-bubble.proche {
+    background: rgba(200,80,0,.88);
+    border-color: #ff8800;
+    box-shadow: 0 0 14px rgba(255,136,0,.55);
+  }
+  .salle-id { display:block; font-size:.68rem; font-weight:700; color:#ffffff; letter-spacing:.07em; text-align:center; }
+  .salle-nom { display:block; font-size:.54rem; color:rgba(255,255,255,.65); margin-top:2px; text-align:center; }
+  #salles-status { font-size:.62rem; color:var(--accent2); letter-spacing:.05em; margin-top:.5rem; min-height:1em; text-align:center; }
+
+  /* MINIMAP */
+  #mm-wrap { position:fixed; top:1.1rem; right:1.3rem; z-index:48; display:none; flex-direction:column; gap:0; }
+  #mm-wrap.visible { display:flex; }
+  #mm-header { background:rgba(0,0,0,.95); border:2px solid #0066ff; border-bottom:none; border-radius:8px 8px 0 0; padding:4px 8px; display:flex; align-items:center; justify-content:space-between; }
+  #mm-title { font-size:.55rem; color:#7fa9ff; letter-spacing:.12em; text-transform:uppercase; }
+  #mm-hint  { font-size:.5rem; color:rgba(127,169,255,.45); }
+  #mm-canvas-wrap { overflow:hidden; border-radius:0 0 8px 8px; border:2px solid #0066ff; border-top:none; box-shadow:0 0 20px rgba(0,102,255,.35); }
+  #minimap { display:block; background:#080b16; cursor:crosshair; }
+
+  /* PROXIMITÉ */
+  #prox-notif { position:fixed; bottom:2.4rem; left:50%; transform:translateX(-50%); background:rgba(8,12,18,.88); border:1px solid var(--accent2); border-radius:10px; padding:.45rem 1.4rem; font-size:.72rem; color:var(--accent2); letter-spacing:.07em; pointer-events:none; z-index:48; white-space:nowrap; opacity:0; transition:opacity .35s; }
+  #prox-notif.visible { opacity:1; }
+
+  /* RECHERCHE SALLES (menu pause) */
+  .pm-search { display:flex; flex-direction:column; gap:.4rem; margin-top:.4rem; }
+  .pm-search input { background:rgba(8,12,18,.9); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:.65rem; padding:.45rem .7rem; border-radius:6px; outline:none; width:100%; }
+  .pm-search input:focus { border-color:var(--accent2); }
+  .pm-search input::placeholder { color:var(--dim); }
+  #salle-results { display:flex; flex-direction:column; gap:.25rem; max-height:140px; overflow-y:auto; }
+  #salle-results::-webkit-scrollbar { width:3px; }
+  #salle-results::-webkit-scrollbar-thumb { background:var(--border); }
+  .salle-result-item { background:rgba(106,127,255,.1); border:1px solid rgba(106,127,255,.25); border-radius:5px; padding:.35rem .7rem; font-size:.62rem; color:var(--text); cursor:pointer; transition:background .15s,border-color .15s; display:flex; justify-content:space-between; align-items:center; }
+  .salle-result-item:hover { background:rgba(106,127,255,.22); border-color:var(--accent2); }
+  .salle-result-id { color:var(--accent2); font-weight:700; }
+  .salle-result-tp { font-size:.52rem; color:var(--dim); }
 </style>
 </head>
 <body>
@@ -111,6 +159,9 @@
   </div>
   <div class="or-sep">ou</div>
   <button class="btn-ghost" id="btn-demo">🎲 Scène de démonstration</button>
+  <button class="btn-ghost" id="btn-load-salles" style="margin-top:.4rem">📍 Charger salles.json</button>
+  <input type="file" id="salles-input" accept=".json" style="display:none">
+  <div id="salles-status"></div>
 </div>
 
 <!-- PROGRESS -->
@@ -121,6 +172,17 @@
 </div>
 
 <div id="canvas-container"></div>
+<div id="salles-overlay"></div>
+<div id="mm-wrap">
+  <div id="mm-header">
+    <span id="mm-title">Minimap — Vue XZ</span>
+    <span id="mm-hint">scroll:zoom · clic salle:téléport</span>
+  </div>
+  <div id="mm-canvas-wrap">
+    <canvas id="minimap" width="220" height="220"></canvas>
+  </div>
+</div>
+<div id="prox-notif"></div>
 
 <div id="crosshair"></div>
 
@@ -144,6 +206,17 @@
       <button class="btn-toggle" id="btn-flip" onclick="flipWorld()">🔄 Flip monde <small style="opacity:.5">[F]</small></button>
       <button class="btn-toggle" id="btn-noclip" onclick="toggleNoclip()">👻 Noclip <small style="opacity:.5">[N]</small></button>
     </div>
+    <div style="border-top:1px solid rgba(80,160,255,.12);margin:.2rem 0;"></div>
+    <div class="pm-row" style="justify-content:space-between;align-items:center;">
+      <span style="font-size:.6rem;color:var(--dim)">Salles :</span>
+      <span id="pm-salles-count" style="font-size:.6rem;color:var(--accent2)">aucune</span>
+      <button class="btn-toggle" id="btn-pm-salles" style="padding:.3rem .7rem;font-size:.6rem">📍 Charger JSON</button>
+    </div>
+    <input type="file" id="salles-input-pm" accept=".json" style="display:none">
+    <div class="pm-search">
+      <input type="text" id="salle-search" placeholder="🔍 Rechercher une salle…" autocomplete="off" spellcheck="false">
+      <div id="salle-results"></div>
+    </div>
   </div>
 
   <div class="pm-click-hint" id="pm-resume">▶ Cliquer ici pour reprendre</div>
@@ -163,6 +236,7 @@
   <div class="hud-row"><span class="key">N</span> Noclip (traverser murs)</div>
   <div class="hud-row" id="hud-noclip-hint" style="display:none;color:var(--accent)"><span class="key" style="color:var(--accent);border-color:var(--accent)">SPC</span>↑ &nbsp;<span class="key" style="color:var(--accent);border-color:var(--accent)">⇧</span>↓ &nbsp;voler librement</div>
   <div class="hud-row"><span class="key">ESC</span> Libérer souris</div>
+  <div id="hud-coords">X — &nbsp; Y — &nbsp; Z —</div>
 </div>
 
 
@@ -408,12 +482,133 @@ let meshForRaycast = null;
 const player = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), onGround: false, height: 1.7 };
 const euler  = new THREE.Euler(0,0,0,'YXZ');
 const keys   = {};
-const GRAVITY=-20, JUMP=8, SPEED=4, SPRINT=2.2;
+const GRAVITY=-20, JUMP=8, SPEED=10, SPRINT=2.2;
 const rdDown = new THREE.Raycaster();
 let ptsMaterial = null;
 let noclip = false;
 let worldFlipped = false;
 let rawParsed = null; // keep original parsed data for re-flip
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SALLES — chargement & affichage
+// ═══════════════════════════════════════════════════════════════════════
+let sallesData    = null;   // données brutes du JSON
+let salleMarkers  = [];     // [{pos, el, data}, ...]
+let explorerScale = 1;      // facteur 30/maxD appliqué lors du chargement PLY
+let sceneBounds   = null;   // {xmin,xmax,zmin,zmax} de la scène chargée
+let minimapCtx    = null;
+let minimapVerts  = [];   // [[x, z], …] subsamplé en coordonnées monde
+const mm = { zoom: 1.0, pan: { x: 0, y: 0 }, drag: { active: false } };
+
+/**
+ * Les coordonnées dans salles.json sont en espace Three.js world
+ * (valeurs telles qu'affichées dans le HUD du joueur).
+ * Aucune transformation n'est nécessaire.
+ */
+function salleToWorld(s) {
+  return new THREE.Vector3(s.x, s.y, s.z);
+}
+
+function clearSalleLabels() {
+  const ov = document.getElementById('salles-overlay');
+  ov.innerHTML = '';
+  salleMarkers = [];
+}
+
+function buildSalleLabels() {
+  clearSalleLabels();
+  if (!sallesData || !sallesData.salles) return;
+  const ov = document.getElementById('salles-overlay');
+  for (const s of sallesData.salles) {
+    const el = document.createElement('div');
+    el.className = 'salle-label';
+    el.innerHTML =
+      `<div class="salle-bubble">`
+      + `<span class="salle-id">${s.id || s.nom}</span>`
+      + (s.description ? `<span class="salle-nom">${s.description}</span>` : '')
+      + `</div>`;
+    ov.appendChild(el);
+    salleMarkers.push({ pos: salleToWorld(s), el, data: s });
+  }
+}
+
+const _ndcVec = new THREE.Vector3();
+const _labelPos = new THREE.Vector3();
+function renderSalleLabels() {
+  if (!salleMarkers.length || !sceneObject) return;
+  const W = innerWidth, H = innerHeight;
+  // Proximité en XZ uniquement — la salle couvre tout l'axe Y
+  const proxMax = (sallesData && sallesData.proximite_seuil ? sallesData.proximite_seuil : 12);
+  const proxMaxSq = proxMax * proxMax;
+
+  const proxOrangeSq = (proxMax * 0.4) * (proxMax * 0.4);
+
+  for (const m of salleMarkers) {
+    const dx = m.pos.x - camera.position.x;
+    const dz = m.pos.z - camera.position.z;
+    const dist2xz = dx * dx + dz * dz;
+    // Projeter le label à la hauteur du regard du joueur
+    _labelPos.set(m.pos.x, camera.position.y, m.pos.z);
+    _ndcVec.copy(_labelPos).project(camera);
+    const inFront  = _ndcVec.z < 1.0;
+    const inRange  = dist2xz < proxMaxSq;
+    const onScreen = Math.abs(_ndcVec.x) < 1.1 && Math.abs(_ndcVec.y) < 1.1;
+    if (inFront && inRange && onScreen) {
+      m.el.style.display = 'block';
+      m.el.style.left = (( _ndcVec.x + 1) / 2 * W) + 'px';
+      m.el.style.top  = ((-_ndcVec.y + 1) / 2 * H) + 'px';
+      const bubble = m.el.querySelector('.salle-bubble');
+      if (bubble) bubble.classList.toggle('proche', dist2xz < proxOrangeSq);
+    } else {
+      m.el.style.display = 'none';
+    }
+  }
+}
+
+function loadSallesData(data) {
+  try {
+    sallesData = typeof data === 'string' ? JSON.parse(data) : data;
+    if (!sallesData.salles || !Array.isArray(sallesData.salles))
+      throw new Error('Clé "salles" manquante ou invalide');
+    const n = sallesData.salles.length;
+    const msg = `✓ ${n} salle${n>1?'s':''} chargée${n>1?'s':''}`;
+    document.getElementById('salles-status').textContent = msg;
+    document.getElementById('pm-salles-count').textContent = `${n} salle${n>1?'s':''}`;
+    if (sceneObject) buildSalleLabels();
+    updateSalleSearch(document.getElementById('salle-search').value);
+  } catch(e) {
+    const err = `⚠ Erreur JSON : ${e.message}`;
+    document.getElementById('salles-status').textContent = err;
+    document.getElementById('pm-salles-count').textContent = 'erreur';
+  }
+}
+
+// Tentative de chargement automatique au démarrage
+fetch('./salles.json')
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(d  => loadSallesData(d))
+  .catch(() => {}); // silencieux si absent
+
+// Bouton drop-screen
+document.getElementById('btn-load-salles').addEventListener('click', () => {
+  document.getElementById('salles-input').click();
+});
+document.getElementById('salles-input').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => loadSallesData(ev.target.result);
+  r.readAsText(file);
+});
+// Bouton menu pause (ESC)
+document.getElementById('btn-pm-salles').addEventListener('click', () => {
+  document.getElementById('salles-input-pm').click();
+});
+document.getElementById('salles-input-pm').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => loadSallesData(ev.target.result);
+  r.readAsText(file);
+});
 
 function initScene() {
   renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -497,6 +692,7 @@ function loadParsed(parsed) {
   const ctr = new THREE.Vector3(); box.getCenter(ctr);
   const maxD = Math.max(sz.x, sz.y, sz.z);
   const scale = 30 / maxD;
+  explorerScale = scale;        // ← mémoriser pour conversion coords salles
   geo.translate(-ctr.x, -ctr.y, -ctr.z); // center on all axes
   geo.scale(scale, scale, scale);
   if(worldFlipped) {
@@ -553,6 +749,22 @@ function loadParsed(parsed) {
   player.vel.set(0,0,0);
   euler.set(0, Math.PI, 0); // face inward
 
+  // Mémoriser les bornes XZ pour la minimap
+  sceneBounds = { xmin: nb.min.x, xmax: nb.max.x, zmin: nb.min.z, zmax: nb.max.z };
+
+  // Subsampler les positions XZ pour la minimap (max ~10 000 pts)
+  const posArr = geo.attributes.position.array;
+  const totalPts = posArr.length / 3;
+  const step = Math.max(1, Math.floor(totalPts / 10000));
+  minimapVerts = [];
+  for (let i = 0; i < totalPts; i += step) {
+    minimapVerts.push([posArr[i * 3], posArr[i * 3 + 2]]);
+  }
+  mm.zoom = 1.0; mm.pan.x = 0; mm.pan.y = 0;
+
+  // Reconstruire les labels de salles avec le nouveau scale/flip
+  if (sallesData) buildSalleLabels();
+
   hideProgress();
   showExplorer();
 }
@@ -605,15 +817,14 @@ function updatePlayer(dt) {
   } else {
     // ── NORMAL physics
     _fwd.y = 0; _fwd.normalize();
-    _right.crossVectors(_fwd, new THREE.Vector3(0,-1,0)).normalize();
+    _right.crossVectors(_fwd, new THREE.Vector3(0,1,0)).normalize();
 
     const move = new THREE.Vector3();
-    if(keys['KeyW']||keys['ArrowUp'])    move.addScaledVector(_fwd,  1);
-    if(keys['KeyS']||keys['ArrowDown'])  move.addScaledVector(_fwd, -1);
-    if(keys['KeyA']||keys['ArrowLeft'])  move.addScaledVector(_right,-1);
-    if(keys['KeyD']||keys['ArrowRight']) move.addScaledVector(_right, 1);
-    if(keys['KeyZ']) move.addScaledVector(_fwd,  1);
-    if(keys['KeyQ']) move.addScaledVector(_right,-1);
+    if(keys['KeyW']||keys['ArrowUp'])                        move.addScaledVector(_fwd,   1);
+    if(keys['KeyS']||keys['ArrowDown'])                      move.addScaledVector(_fwd,  -1);
+    if(keys['KeyA']||keys['ArrowLeft']||keys['KeyQ'])        move.addScaledVector(_right,-1);
+    if(keys['KeyD']||keys['ArrowRight'])                     move.addScaledVector(_right, 1);
+    if(keys['KeyZ'])                                         move.addScaledVector(_fwd,   1);
     if(move.lengthSq()>0) move.normalize().multiplyScalar(speed);
 
     player.vel.x = move.x;
@@ -716,19 +927,217 @@ function showExplorer() {
   document.getElementById('hud').classList.add('visible');
   document.getElementById('row-ptsize').style.display = (rawParsed && rawParsed.isPointCloud) ? 'flex' : 'none';
   document.getElementById('pause-menu').classList.add('visible');
+  document.getElementById('mm-wrap').classList.add('visible');
   setTimeout(()=> renderer.domElement.requestPointerLock(), 400);
 }
 function backToMenu() {
   document.exitPointerLock();
   document.getElementById('drop-screen').classList.remove('hidden');
-  ['top-bar','hud','pause-menu','crosshair'].forEach(id=>document.getElementById(id).classList.remove('visible'));
+  ['top-bar','hud','pause-menu','crosshair','mm-wrap'].forEach(id=>document.getElementById(id).classList.remove('visible'));
+  document.getElementById('prox-notif').classList.remove('visible');
   if(sceneObject){ scene.remove(sceneObject); sceneObject=null; }
-  heightMap=null; meshForRaycast=null; rawParsed=null;
+  heightMap=null; meshForRaycast=null; rawParsed=null; sceneBounds=null;
   worldFlipped=false; noclip=false;
+  clearSalleLabels();
   document.getElementById('btn-flip').classList.remove('active');
   document.getElementById('btn-noclip').classList.remove('active');
   document.getElementById('hud-noclip-hint').style.display='none';
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MINIMAP  — style MinimapDistance (XZ top-down, zoom/pan, clic=téléport)
+// ═══════════════════════════════════════════════════════════════════════
+function initMinimap() {
+  const cvs = document.getElementById('minimap');
+  minimapCtx = cvs.getContext('2d');
+
+  // Zoom molette
+  cvs.addEventListener('wheel', e => {
+    e.preventDefault();
+    mm.zoom = Math.max(0.5, Math.min(8, mm.zoom + (e.deltaY > 0 ? -0.15 : 0.15)));
+  }, { passive: false });
+
+  // Pan — clic droit ou milieu
+  cvs.addEventListener('mousedown', e => {
+    if (e.button === 1 || e.button === 2) {
+      mm.drag = { active: true, sx: e.clientX, sy: e.clientY, px: mm.pan.x, py: mm.pan.y };
+    }
+  });
+  window.addEventListener('mousemove', e => {
+    if (mm.drag.active) {
+      mm.pan.x = mm.drag.px + (e.clientX - mm.drag.sx);
+      mm.pan.y = mm.drag.py + (e.clientY - mm.drag.sy);
+    }
+  });
+  window.addEventListener('mouseup', () => { mm.drag.active = false; });
+  cvs.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Clic gauche → téléporter sur la salle la plus proche du clic
+  cvs.addEventListener('click', e => {
+    if (!sceneObject || !sceneBounds) return;
+    const rect = cvs.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    let best = null, bestD2 = 22 * 22; // seuil 22px
+    for (const m of salleMarkers) {
+      const [msX, msY] = mmWorldToScreen(m.pos.x, m.pos.z);
+      const d2 = (msX - sx) ** 2 + (msY - sy) ** 2;
+      if (d2 < bestD2) { bestD2 = d2; best = m; }
+    }
+    if (best) teleportToSalle(best.data);
+  });
+}
+
+function mmWorldToScreen(wx, wz) {
+  const cvs = minimapCtx.canvas;
+  const W = cvs.width, H = cvs.height;
+  const { xmin, xmax, zmin, zmax } = sceneBounds;
+  const sx = (wx - xmin) / (xmax - xmin || 1);
+  const sy = 1 - (wz - zmin) / (zmax - zmin || 1); // Z↑ sur la carte
+  const cx = W / 2, cy = H / 2;
+  return [
+    cx + (sx * W - cx) * mm.zoom + mm.pan.x,
+    cy + (sy * H - cy) * mm.zoom + mm.pan.y,
+  ];
+}
+
+const _mmFwd = new THREE.Vector3();
+function drawMinimap() {
+  if (!minimapCtx || !sceneObject || !sceneBounds) return;
+  const ctx = minimapCtx;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // Fond
+  ctx.fillStyle = '#050711';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grille
+  ctx.strokeStyle = '#181b2a';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    ctx.beginPath(); ctx.moveTo(t * W, 0); ctx.lineTo(t * W, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, t * H); ctx.lineTo(W, t * H); ctx.stroke();
+  }
+
+  // Points nuage de points (XZ)
+  ctx.fillStyle = '#3d7cff';
+  for (const [vx, vz] of minimapVerts) {
+    const [sx, sy] = mmWorldToScreen(vx, vz);
+    if (sx < -2 || sx > W + 2 || sy < -2 || sy > H + 2) continue;
+    ctx.fillRect(sx, sy, 1.5, 1.5);
+  }
+
+  // Salles — bandeaux bleu/orange
+  const mmProxOrange = (sallesData && sallesData.proximite_seuil ? sallesData.proximite_seuil : 12) * 0.4;
+  ctx.font = 'bold 8px "Space Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const m of salleMarkers) {
+    const [sx, sy] = mmWorldToScreen(m.pos.x, m.pos.z);
+    const label = m.data.id || m.data.nom;
+    const tw = ctx.measureText(label).width;
+    const bw = tw + 10, bh = 13;
+    const dx = m.pos.x - player.pos.x, dz = m.pos.z - player.pos.z;
+    const proche = Math.sqrt(dx*dx + dz*dz) < mmProxOrange;
+    ctx.fillStyle   = proche ? 'rgba(200,80,0,.88)'  : 'rgba(0,60,180,.82)';
+    ctx.strokeStyle = proche ? '#ff8800'              : '#4a90ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(sx - bw/2, sy - bh/2, bw, bh, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, sx, sy);
+  }
+  ctx.textBaseline = 'alphabetic';
+
+  // Joueur (rond vert)
+  const [px, pz] = mmWorldToScreen(player.pos.x, player.pos.z);
+  ctx.save();
+  ctx.shadowColor = '#38f0b8'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(px, pz, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#38f0b8';
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PROXIMITÉ SALLE  (distance XZ uniquement — Y = hauteur, ignoré)
+// ═══════════════════════════════════════════════════════════════════════
+function updateProxNotif() {
+  const notif = document.getElementById('prox-notif');
+  if (!sceneObject || !salleMarkers.length) { notif.classList.remove('visible'); return; }
+  const thresh = (sallesData && sallesData.proximite_seuil ? sallesData.proximite_seuil : 6);
+  let nearest = null, nearestDist = Infinity;
+  for (const m of salleMarkers) {
+    // Distance XZ seulement (la salle couvre tout l'axe Y)
+    const dx = m.pos.x - player.pos.x;
+    const dz = m.pos.z - player.pos.z;
+    const d  = Math.sqrt(dx * dx + dz * dz);
+    if (d < thresh && d < nearestDist) { nearestDist = d; nearest = m; }
+  }
+  if (nearest) {
+    notif.classList.add('visible');
+    notif.textContent = `📍 ${nearest.data.nom || nearest.data.id}`;
+  } else {
+    notif.classList.remove('visible');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TÉLÉPORTATION VERS UNE SALLE
+// ═══════════════════════════════════════════════════════════════════════
+function teleportToSalle(s) {
+  const wp = salleToWorld(s);
+  player.pos.x = wp.x;
+  player.pos.z = wp.z;
+  // Ajuster Y via la heightmap si disponible, sinon garder la hauteur actuelle
+  if (heightMap) {
+    const hy = heightMap.sample(wp.x, wp.z);
+    if (hy !== null) player.pos.y = hy + player.height + 0.1;
+  }
+  player.vel.set(0, 0, 0);
+  // Reprendre l'exploration (verrouiller le pointeur)
+  renderer.domElement.requestPointerLock();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RECHERCHE DE SALLES (menu ESC)
+// ═══════════════════════════════════════════════════════════════════════
+function updateSalleSearch(query) {
+  const results = document.getElementById('salle-results');
+  results.innerHTML = '';
+  if (!sallesData || !sallesData.salles) return;
+  const q = query.trim().toLowerCase();
+  const matches = q === ''
+    ? sallesData.salles
+    : sallesData.salles.filter(s =>
+        (s.id  || '').toLowerCase().includes(q) ||
+        (s.nom || '').toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q)
+      );
+  for (const s of matches) {
+    const item = document.createElement('div');
+    item.className = 'salle-result-item';
+    item.innerHTML =
+      `<span><span class="salle-result-id">${s.id || s.nom}</span>`
+      + (s.description ? ` <span style="color:var(--dim);font-size:.55rem">— ${s.description}</span>` : '')
+      + `</span><span class="salle-result-tp">↩ Téléporter</span>`;
+    item.addEventListener('click', () => teleportToSalle(s));
+    results.appendChild(item);
+  }
+}
+
+document.getElementById('salle-search').addEventListener('input', e => {
+  updateSalleSearch(e.target.value);
+});
+// Initialiser la liste au focus (afficher toutes les salles)
+document.getElementById('salle-search').addEventListener('focus', e => {
+  updateSalleSearch(e.target.value);
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 //  FILE INPUT
@@ -775,9 +1184,17 @@ function animate() {
   const now=performance.now(); const dt=Math.min((now-last)/1000,.05); last=now;
   updatePlayer(dt);
   renderer.render(scene, camera);
+  renderSalleLabels();
+  drawMinimap();
+  updateProxNotif();
+  if (sceneObject) {
+    document.getElementById('hud-coords').textContent =
+      `X ${player.pos.x.toFixed(3)}   Y ${player.pos.y.toFixed(3)}   Z ${player.pos.z.toFixed(3)}`;
+  }
 }
 
 initScene();
+initMinimap();
 animate();
 </script>
 </body>

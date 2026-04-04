@@ -1,0 +1,13 @@
+{
+  "proximite_seuil": 6.0,
+  "salles": [
+    {
+      "id": "VI.005",
+      "nom": "Salle VI.005",
+      "x": 3.03,
+      "y": -2.93,
+      "z": -12.17,
+      "description": "Salle de cours"
+    }
+  ]
+}
