@@ -9,7 +9,7 @@ Images
    ↓
 [run_reconstruction.py] 
    ↓
-Fichier GLB 3D
+Fichier PLY
    ↓
 [navigation.py]
    ↓
@@ -28,7 +28,7 @@ Application Web Interactive
 
 ```bash
 # Naviguer vers le dossier navigation
-cd Desktop/map-anything/navigation
+cd /mapanyCS/navigation
 
 # Créer l'environnement (si pas déjà fait)
 conda create -n mapanything python=3.12 -y
@@ -37,7 +37,7 @@ conda activate mapanything
 # Installer MapAnything depuis la racine (si pas déjà fait)
 cd ..
 pip install -e .
-cd navigation
+
 
 # Installer les dépendances web
 pip install flask trimesh
@@ -93,15 +93,12 @@ http://127.0.0.1:5000/pathfinding : trajectoires entre deux points en tenant com
 
 ## Étape 3 : Annotation des Salles de Classe
 
-Cette fonctionnalité permet d'annoter des salles sur la carte 2D (minimap), d'afficher
-une bannière de proximité et de se téléporter instantanément dans une salle via une barre 
-de recherche.
+Cette fonctionnalité permet d'annoter des salles sur la carte 3D (minimap) issu du fichier PLY_explorer.html, d'afficher une bannière de proximité et de se téléporter instantanément dans une salle via une barre de recherche.
 
 ### Configurer `salles.json`
 
-Créez ou éditez le fichier `salles.json` à la racine du projet (`map-anything/salles.json`).
-Ce fichier doit être chargé depuis le PLY_explorer.html pour pouvoir profiter de l'annotation 
-des salles. Il suffit de press Echap et de charger `salles.json` depuis votre ordinateur.
+Créez ou éditez le fichier `salles.json` à la racine du projet (`mapanyCS/salles.json`).
+Ce fichier doit être chargé depuis le PLY_explorer.html pour pouvoir profiter de l'annotation des salles. Il suffit de press Echap et de charger `salles.json` depuis votre ordinateur.
 
 ```json
 {
