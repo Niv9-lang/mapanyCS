@@ -57,9 +57,7 @@ python reconstruction_medium.py \
     --image_folder ../sol_vivant \
     --output sol_vivant.ply
 ```
-
-### Résultat
-Un fichier `sol_vivant.ply` est créé
+Le paramètre --image_folder permet de spécifier le dossier où se trouve les images nécessaires à la reconstruction 3D. Le paramètre --output permet de spécifier le nom du fichier en sortie. Ce dernier sera enregistré dans la racine du projet mapanyCS/.
 
 ---
 
