@@ -7,11 +7,11 @@ Guide complet pour générer une reconstruction 3D et la naviguer interactivemen
 ```
 Images
    ↓
-[run_reconstruction.py] 
+[reconstruction_medium.py] 
    ↓
 Fichier PLY
    ↓
-[navigation.py]
+[navigation_obstacle.py]
    ↓
 Application Web Interactive
 ```
@@ -89,14 +89,15 @@ http://127.0.0.1:5000/minimap-distance : mesure de la distance entre deux points
 http://127.0.0.1:5000/pathfinding : trajectoires entre deux points en tenant compte des obstacles
 
 
-## Étape 3 : Annotation des Salles de Classe
+## Étape 3 : Structure et annotation des Salles de Classe
 
-Cette fonctionnalité permet d'annoter des salles sur la carte 3D (minimap) issu du fichier PLY_explorer.html, d'afficher une bannière de proximité et de se téléporter instantanément dans une salle via une barre de recherche.
+Il est nécessaire de créer à la racine du projet `/map-anything` un dossier "database" où se trouvera les fichiers de reconstruction 3D `.ply` ainsi que les fichiers `.json`associés. Attention, ces deux derniers fichiers doivent porter le même nom pour qu'on les associe.
 
-### Configurer `salles.json`
+Ensuite, il faut lancer un serveur web local (votre ordinateur devient ce serveur) à l'aide de la commande `python -m http.server`. La page internet de navigation sera ensuite disponible à l'adresse `http://localhost:8080/PLY_explorer.html`.
 
-Créez ou éditez le fichier `salles.json` à la racine du projet (`mapanyCS/salles.json`).
-Ce fichier doit être chargé depuis le PLY_explorer.html pour pouvoir profiter de l'annotation des salles. Il suffit de press Echap et de charger `salles.json` depuis votre ordinateur.
+Les fichiers en `.json`permettent d'annoter les positions XYZ de chaque salle pour les localiser dans les fichiers `.ply`.
+
+### Configurer `.json`
 
 ```json
 {

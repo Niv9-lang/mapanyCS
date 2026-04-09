@@ -36,6 +36,17 @@
   .btn-ghost:hover { border-color:var(--accent2); color:var(--accent2); }
   #file-input { display:none; }
 
+  /* SÉLECTION D'ESPACE */
+  #spaces-section { display:none; flex-direction:column; align-items:center; gap:.8rem; width:min(700px,94vw); }
+  .spaces-section-title { font-size:.6rem; color:var(--dim); letter-spacing:.18em; text-transform:uppercase; }
+  #spaces-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:.7rem; width:100%; }
+  .space-card { background:rgba(56,240,184,.03); border:1px solid var(--border); border-radius:12px; padding:1.1rem .9rem; display:flex; flex-direction:column; align-items:center; gap:.5rem; cursor:pointer; transition:border-color .2s,background .2s,transform .15s,box-shadow .2s; }
+  .space-card:hover { border-color:var(--accent); background:rgba(56,240,184,.07); transform:translateY(-2px); box-shadow:0 6px 22px rgba(56,240,184,.12); }
+  .space-card-icon { width:40px; height:40px; border-radius:10px; background:rgba(56,240,184,.1); display:flex; align-items:center; justify-content:center; }
+  .space-card-icon svg { width:20px; height:20px; stroke:var(--accent); fill:none; stroke-width:1.5; stroke-linejoin:round; }
+  .space-card-name { font-family:'Syne',sans-serif; font-size:.82rem; font-weight:700; text-align:center; color:var(--text); }
+  .space-card-desc { font-size:.55rem; color:var(--dim); text-align:center; line-height:1.5; }
+
   /* TOP BAR */
   #top-bar { position:fixed; top:0; left:0; right:0; padding:.8rem 1.4rem; display:flex; align-items:center; justify-content:space-between; background:linear-gradient(to bottom,rgba(8,12,18,.95),transparent); z-index:50; opacity:0; pointer-events:none; transition:opacity .5s; }
   #top-bar.visible { opacity:1; pointer-events:all; }
@@ -139,6 +150,20 @@
   .salle-result-item:hover { background:rgba(106,127,255,.22); border-color:var(--accent2); }
   .salle-result-id { color:var(--accent2); font-weight:700; }
   .salle-result-tp { font-size:.52rem; color:var(--dim); }
+
+  /* SÉLECTEUR D'ESPACE (menu pause) */
+  #pm-spaces-section { display:none; flex-direction:column; gap:.3rem; margin-top:.2rem; }
+  .pm-spaces-label { font-size:.58rem; color:var(--dim); letter-spacing:.1em; text-transform:uppercase; }
+  #pm-spaces-list { display:flex; flex-direction:column; gap:.2rem; max-height:120px; overflow-y:auto; }
+  #pm-spaces-list::-webkit-scrollbar { width:3px; }
+  #pm-spaces-list::-webkit-scrollbar-thumb { background:var(--border); }
+  .pm-space-btn { background:rgba(56,240,184,.05); border:1px solid var(--border); border-radius:5px; padding:.32rem .7rem; font-size:.62rem; color:var(--text); font-family:'Space Mono',monospace; cursor:pointer; text-align:left; transition:background .15s,border-color .15s; }
+  .pm-space-btn:hover { background:rgba(56,240,184,.12); border-color:var(--accent); color:var(--accent); }
+  .pm-space-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(56,240,184,.1); font-weight:700; pointer-events:none; }
+  #file-proto-warn { display:none; max-width:380px; background:rgba(255,95,95,.08); border:1px solid rgba(255,95,95,.3); border-radius:8px; padding:.65rem 1rem; font-size:.62rem; color:#ff9f9f; line-height:1.7; text-align:center; }
+  #file-proto-warn code { background:rgba(255,255,255,.08); border-radius:3px; padding:.05rem .35rem; font-family:'Space Mono',monospace; color:#fff; }
+  #manual-load-link { font-size:.6rem; color:var(--dim); cursor:pointer; text-decoration:underline; margin-top:.2rem; display:none; }
+  #manual-load-link:hover { color:var(--accent2); }
 </style>
 </head>
 <body>
@@ -148,6 +173,22 @@
   <div class="logo">PLY Explorer</div>
   <div class="subtitle">Nuages de points &amp; maillages 3D</div>
   <div class="badge">✦ Supporte les nuages de points issus de photogrammétrie</div>
+
+  <!-- Avertissement protocole file:// -->
+  <div id="file-proto-warn">
+    ⚠ Lancez un serveur local pour accéder à la base de données :<br>
+    <code>python -m http.server 8080</code><br>
+    puis ouvrez <code>http://localhost:8080/PLY_explorer.html</code>
+  </div>
+
+  <!-- Sélection d'espace (visible si database/index.json est trouvé) -->
+  <div id="spaces-section">
+    <div class="spaces-section-title">Choisir un espace à explorer</div>
+    <div id="spaces-grid"></div>
+    <span id="manual-load-link">ou charger un fichier .ply manuellement</span>
+  </div>
+
+  <!-- Zone de dépôt — visible uniquement si pas de database, ou sur demande -->
   <div class="drop-zone" id="drop-zone">
     <div class="drop-icon">
       <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
@@ -157,9 +198,8 @@
     <button class="btn-primary" onclick="document.getElementById('file-input').click()">Choisir un fichier</button>
     <input type="file" id="file-input" accept=".ply">
   </div>
-  <div class="or-sep">ou</div>
+  <div class="or-sep" id="or-demo-sep">ou</div>
   <button class="btn-ghost" id="btn-demo">🎲 Scène de démonstration</button>
-  <button class="btn-ghost" id="btn-load-salles" style="margin-top:.4rem">📍 Charger salles.json</button>
   <input type="file" id="salles-input" accept=".json" style="display:none">
   <div id="salles-status"></div>
 </div>
@@ -176,7 +216,7 @@
 <div id="mm-wrap">
   <div id="mm-header">
     <span id="mm-title">Minimap — Vue XZ</span>
-    <span id="mm-hint">scroll:zoom · clic salle:téléport</span>
+    <span id="mm-hint">scroll:zoom · clic salle:naviguer</span>
   </div>
   <div id="mm-canvas-wrap">
     <canvas id="minimap" width="220" height="220"></canvas>
@@ -188,14 +228,14 @@
 
 <!-- PAUSE MENU (visible quand souris déverrouillée) -->
 <div id="pause-menu">
-  <div class="pm-title">🖱️ Cliquez pour explorer</div>
+  <div class="pm-title">Cliquez pour explorer</div>
   <div class="pm-sub">ESC pour revenir ici</div>
 
   <div class="pm-card">
     <div class="pm-row" id="row-ptsize">
       <label>Taille pts</label>
-      <input type="range" id="pt-size" min="0.5" max="8" step="0.1" value="2">
-      <span class="val" id="pt-size-val">2.0</span>
+      <input type="range" id="pt-size" min="0.5" max="8" step="0.1" value="6">
+      <span class="val" id="pt-size-val">6.0</span>
     </div>
     <div class="pm-row">
       <label>FOV</label>
@@ -203,7 +243,7 @@
       <span class="val" id="fov-val">75°</span>
     </div>
     <div class="pm-btns">
-      <button class="btn-toggle" id="btn-flip" onclick="flipWorld()">🔄 Flip monde <small style="opacity:.5">[F]</small></button>
+      <button class="btn-toggle" id="btn-flip" onclick="flipWorld()"> 180° : Flip monde <small style="opacity:.5">[F]</small></button>
       <button class="btn-toggle" id="btn-noclip" onclick="toggleNoclip()">👻 Noclip <small style="opacity:.5">[N]</small></button>
     </div>
     <div style="border-top:1px solid rgba(80,160,255,.12);margin:.2rem 0;"></div>
@@ -216,6 +256,11 @@
     <div class="pm-search">
       <input type="text" id="salle-search" placeholder="🔍 Rechercher une salle…" autocomplete="off" spellcheck="false">
       <div id="salle-results"></div>
+    </div>
+    <div id="pm-spaces-section">
+      <div style="border-top:1px solid rgba(80,160,255,.12);margin:.2rem 0;"></div>
+      <div class="pm-spaces-label">Changer d'espace</div>
+      <div id="pm-spaces-list"></div>
     </div>
   </div>
 
@@ -234,6 +279,7 @@
   <div class="hud-row"><span class="key">Z</span><span class="key">Q</span><span class="key">S</span><span class="key">D</span> Déplacer</div>
   <div class="hud-row"><span class="key">SPC</span> Sauter &nbsp; <span class="key">⇧</span> Sprint</div>
   <div class="hud-row"><span class="key">N</span> Noclip (traverser murs)</div>
+  <div class="hud-row" id="hud-path-hint" style="display:none"><span class="key" style="color:var(--accent2);border-color:var(--accent2)">C</span> <span style="color:var(--accent2)">Annuler le chemin</span></div>
   <div class="hud-row" id="hud-noclip-hint" style="display:none;color:var(--accent)"><span class="key" style="color:var(--accent);border-color:var(--accent)">SPC</span>↑ &nbsp;<span class="key" style="color:var(--accent);border-color:var(--accent)">⇧</span>↓ &nbsp;voler librement</div>
   <div class="hud-row"><span class="key">ESC</span> Libérer souris</div>
   <div id="hud-coords">X — &nbsp; Y — &nbsp; Z —</div>
@@ -489,6 +535,12 @@ let noclip = false;
 let worldFlipped = false;
 let rawParsed = null; // keep original parsed data for re-flip
 
+// ── Pathfinding A* ──────────────────────────────────────────────────────────
+let occGrid    = null;   // grille d'occupation (réinitialisée à chaque nouveau PLY)
+let activePath = null;   // [[wx,wz], …] chemin courant en coords monde
+let pathLine   = null;   // THREE.Line affiché dans la scène
+let pathTarget = null;   // objet salle de destination
+
 // ═══════════════════════════════════════════════════════════════════════
 //  SALLES — chargement & affichage
 // ═══════════════════════════════════════════════════════════════════════
@@ -583,16 +635,128 @@ function loadSallesData(data) {
   }
 }
 
-// Tentative de chargement automatique au démarrage
-fetch('./salles.json')
-  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(d  => loadSallesData(d))
-  .catch(() => {}); // silencieux si absent
+// ── Chargement depuis la base database/ ────────────────────────────────────
+// Format database/index.json : { "files": ["nom_sans_extension", ...] }
+// Chaque entrée correspond à database/<nom>.ply + database/<nom>.json
 
-// Bouton drop-screen
-document.getElementById('btn-load-salles').addEventListener('click', () => {
-  document.getElementById('salles-input').click();
-});
+let dbSpaces   = [];      // liste des espaces chargée depuis index.json
+let currentFile = null;   // fichier actuellement chargé
+
+// Transforme "vivant_RDC" → "Vivant RDC"
+function fileToLabel(f) {
+  return f.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function loadSpacesIndex() {
+  // Protocole file:// — fetch impossible, afficher l'avertissement
+  if (window.location.protocol === 'file:') {
+    document.getElementById('file-proto-warn').style.display = 'block';
+    return;
+  }
+  try {
+    const resp = await fetch('database/index.json');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const files = data.files || [];
+    if (!files.length) return;
+    dbSpaces = files.map(f => ({ file: f, name: fileToLabel(f) }));
+    renderSpaceCards(dbSpaces);
+    renderPmSpaces(dbSpaces);
+  } catch(e) {} // silencieux si database/ absent
+}
+
+function renderSpaceCards(spaces) {
+  const grid    = document.getElementById('spaces-grid');
+  const section = document.getElementById('spaces-section');
+  const dropZone= document.getElementById('drop-zone');
+  const orDemo  = document.getElementById('or-demo-sep');
+  const manualLink = document.getElementById('manual-load-link');
+  grid.innerHTML = '';
+  for (const s of spaces) {
+    const card = document.createElement('div');
+    card.className = 'space-card';
+    card.innerHTML =
+      `<div class="space-card-icon">
+        <svg viewBox="0 0 24 24"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>
+       </div>
+       <div class="space-card-name">${s.name}</div>`;
+    card.addEventListener('click', () => loadSpaceByDef(s));
+    grid.appendChild(card);
+  }
+  // La database est disponible : cacher la zone de dépôt, afficher la grille
+  section.style.display  = 'flex';
+  dropZone.style.display = 'none';
+  orDemo.style.display   = 'none';
+  manualLink.style.display = 'inline';
+  manualLink.onclick = () => {
+    dropZone.style.display = 'flex';
+    manualLink.style.display = 'none';
+  };
+}
+
+function renderPmSpaces(spaces) {
+  const list    = document.getElementById('pm-spaces-list');
+  const section = document.getElementById('pm-spaces-section');
+  if (!spaces.length) return;
+  list.innerHTML = '';
+  for (const s of spaces) {
+    const btn = document.createElement('button');
+    btn.className = 'pm-space-btn' + (s.file === currentFile ? ' active' : '');
+    btn.textContent = s.file === currentFile ? '▶ ' + s.name : s.name;
+    btn.addEventListener('click', () => switchSpace(s));
+    list.appendChild(btn);
+  }
+  section.style.display = 'flex';
+}
+
+async function loadSpaceByDef(def) {
+  document.getElementById('drop-screen').classList.add('hidden');
+  setProgress('CHARGEMENT DU MODÈLE…', 10);
+  try {
+    const resp = await fetch(`database/${def.file}.ply`);
+    if (!resp.ok) throw new Error(`database/${def.file}.ply introuvable`);
+    setProgress('LECTURE DU FICHIER…', 35);
+    const buffer = await resp.arrayBuffer();
+    setProgress('PARSING PLY…', 65);
+    const loader = new PLYLoader();
+    const parsed = loader.parse(buffer);
+    setProgress('CONSTRUCTION SCÈNE…', 85);
+    currentFile = def.file;
+    // JSON des salles de cet espace (même nom que le PLY)
+    fetch(`database/${def.file}.json`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && loadSallesData(d))
+      .catch(() => {});
+    await new Promise(r => setTimeout(r, 30));
+    worldFlipped = true;
+    document.getElementById('btn-flip').classList.add('active');
+    loadParsed(parsed);
+    // Mettre à jour le sélecteur dans le menu pause
+    renderPmSpaces(dbSpaces);
+  } catch(err) {
+    hideProgress();
+    document.getElementById('drop-screen').classList.remove('hidden');
+    alert('Erreur de chargement : ' + err.message);
+  }
+}
+
+async function switchSpace(def) {
+  if (def.file === currentFile) return;
+  // Nettoyer la scène sans revenir à l'écran de démarrage
+  document.exitPointerLock();
+  clearPath(); occGrid = null;
+  if (sceneObject) { scene.remove(sceneObject); sceneObject = null; }
+  heightMap = null; meshForRaycast = null; rawParsed = null; sceneBounds = null;
+  worldFlipped = false; noclip = false;
+  clearSalleLabels(); sallesData = null;
+  document.getElementById('btn-flip').classList.remove('active');
+  document.getElementById('btn-noclip').classList.remove('active');
+  document.getElementById('hud-noclip-hint').style.display = 'none';
+  document.getElementById('pause-menu').classList.remove('visible');
+  await loadSpaceByDef(def);
+}
+
+// (btn-load-salles supprimé — salles chargées automatiquement depuis database/)
 document.getElementById('salles-input').addEventListener('change', e => {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
@@ -636,6 +800,7 @@ function initScene() {
     if(e.code==='Space') e.preventDefault();
     if(e.code==='KeyN') toggleNoclip();
     if(e.code==='KeyF') flipWorld();
+    if(e.code==='KeyC') clearPath();
   });
   window.addEventListener('keyup',   e=>{ keys[e.code]=false; });
 
@@ -676,6 +841,8 @@ function loadParsed(parsed) {
   if(sceneObject){ scene.remove(sceneObject); sceneObject=null; }
   heightMap=null; meshForRaycast=null; ptsMaterial=null;
   rawParsed = parsed;
+  occGrid = null;
+  clearPath();
 
   const { verts, normals, colors, indices, isPointCloud } = parsed;
   const geo = new THREE.BufferGeometry();
@@ -713,7 +880,7 @@ function loadParsed(parsed) {
 
   if (isPointCloud) {
     ptsMaterial = new THREE.PointsMaterial({
-      size: 0.02,
+      size: 0.06,
       vertexColors: !!colors,
       color: colors ? 0xffffff : 0x88bbdd,
       sizeAttenuation: true,
@@ -935,6 +1102,7 @@ function backToMenu() {
   document.getElementById('drop-screen').classList.remove('hidden');
   ['top-bar','hud','pause-menu','crosshair','mm-wrap'].forEach(id=>document.getElementById(id).classList.remove('visible'));
   document.getElementById('prox-notif').classList.remove('visible');
+  clearPath(); occGrid = null;
   if(sceneObject){ scene.remove(sceneObject); sceneObject=null; }
   heightMap=null; meshForRaycast=null; rawParsed=null; sceneBounds=null;
   worldFlipped=false; noclip=false;
@@ -983,7 +1151,7 @@ function initMinimap() {
       const d2 = (msX - sx) ** 2 + (msY - sy) ** 2;
       if (d2 < bestD2) { bestD2 = d2; best = m; }
     }
-    if (best) teleportToSalle(best.data);
+    if (best) showPathToSalle(best.data);
   });
 }
 
@@ -1051,6 +1219,24 @@ function drawMinimap() {
   }
   ctx.textBaseline = 'alphabetic';
 
+  // Chemin A* — trait bleu pointillé
+  if (activePath && activePath.length >= 2) {
+    ctx.save();
+    ctx.strokeStyle = '#ff3333';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.shadowColor = '#ff3333'; ctx.shadowBlur = 4;
+    ctx.beginPath();
+    const [px0, py0] = mmWorldToScreen(activePath[0][0], activePath[0][1]);
+    ctx.moveTo(px0, py0);
+    for (let i = 1; i < activePath.length; i++) {
+      const [ppx, ppy] = mmWorldToScreen(activePath[i][0], activePath[i][1]);
+      ctx.lineTo(ppx, ppy);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Joueur (rond vert)
   const [px, pz] = mmWorldToScreen(player.pos.x, player.pos.z);
   ctx.save();
@@ -1081,7 +1267,7 @@ function updateProxNotif() {
   }
   if (nearest) {
     notif.classList.add('visible');
-    notif.textContent = `📍 ${nearest.data.nom || nearest.data.id}`;
+    notif.textContent = `${nearest.data.nom || nearest.data.id}`;
   } else {
     notif.classList.remove('visible');
   }
@@ -1105,6 +1291,334 @@ function teleportToSalle(s) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  PATHFINDING A* — navigation vers une salle
+//  Détection sol/obstacle par histogramme Y (même logique que
+//  navigation_obstacle.py, adaptée à l'espace world PLY_explorer où
+//  Y minimum = sol car la gravité tire vers le bas).
+// ═══════════════════════════════════════════════════════════════════════
+
+class MinHeap {
+  constructor() { this.h = []; }
+  push(item, p) { this.h.push({item, p}); this._up(this.h.length - 1); }
+  pop() {
+    const top = this.h[0]; const last = this.h.pop();
+    if (this.h.length) { this.h[0] = last; this._dn(0); }
+    return top.item;
+  }
+  get size() { return this.h.length; }
+  _up(i) {
+    while (i > 0) {
+      const p = (i-1)>>1;
+      if (this.h[p].p <= this.h[i].p) break;
+      [this.h[p], this.h[i]] = [this.h[i], this.h[p]]; i = p;
+    }
+  }
+  _dn(i) {
+    const n = this.h.length;
+    for(;;) {
+      let m = i; const l=2*i+1, r=2*i+2;
+      if (l<n && this.h[l].p < this.h[m].p) m = l;
+      if (r<n && this.h[r].p < this.h[m].p) m = r;
+      if (m===i) break;
+      [this.h[m], this.h[i]] = [this.h[i], this.h[m]]; i = m;
+    }
+  }
+}
+
+function buildOccGrid(gs = 64) {
+  if (!sceneObject || !heightMap || !sceneBounds) return null;
+  const verts = sceneObject.geometry.attributes.position.array;
+  if (!verts || verts.length < 9) return null;
+
+  const { xmin, xmax, zmin, zmax } = sceneBounds;
+  const spanX = (xmax - xmin) || 0.01;
+  const spanZ = (zmax - zmin) || 0.01;
+  const ymin = heightMap.minY, ymax = heightMap.maxY;
+  const yRange = (ymax - ymin) || 0.01;
+
+  // ── 1. Détection du sol par histogramme Y ──────────────────────────
+  // En PLY_explorer (gravité vers Y-), le sol concentre la densité de
+  // points dans les 20 % inférieurs de l'étendue Y.
+  const N_HIST = 100;
+  const hist = new Float64Array(N_HIST);
+  for (let i = 1; i < verts.length; i += 3) {
+    const b = Math.floor((verts[i] - ymin) / yRange * N_HIST);
+    if (b >= 0 && b < N_HIST) hist[b]++;
+  }
+  // Lissage fenêtre 5 pour éliminer le bruit
+  const hs = new Float64Array(N_HIST);
+  for (let b = 0; b < N_HIST; b++) {
+    let s=0, n=0;
+    for (let d=-2; d<=2; d++) { const nb=b+d; if(nb>=0&&nb<N_HIST){s+=hist[nb];n++;} }
+    hs[b] = s / n;
+  }
+  // Pic dominant dans les 20 % inférieurs = plancher
+  const topBin = Math.floor(N_HIST * 0.20);
+  let floorBin = 0;
+  for (let b = 1; b < topBin; b++) if (hs[b] > hs[floorBin]) floorBin = b;
+  const floorYCenter = ymin + (floorBin + 0.5) / N_HIST * yRange;
+  const band = yRange * 0.05;   // bande ±5 % de l'étendue Y autour du sol
+
+  // ── 2. Hauteurs obstacles au-dessus du plancher ────────────────────
+  // On cherche les points entre obsMinH et obsMaxH au-dessus du sol.
+  // obsMaxH ≤ hauteur joueur × 1.5 pour éviter de marquer le plafond.
+  const obsMinH = Math.max(0.08, yRange * 0.02);   // ~2 % étendue Y, min 0.08
+  const obsMaxH = player.height * 1.5;              // 1.5 × hauteur joueur
+
+  // ── 3. Construction grille brute ───────────────────────────────────
+  const hasFloor = new Uint8Array(gs * gs);
+  const hasObs   = new Uint8Array(gs * gs);
+
+  for (let i = 0; i < verts.length; i += 3) {
+    const vx = verts[i], vy = verts[i+1], vz = verts[i+2];
+    if (vx < xmin || vx > xmax || vz < zmin || vz > zmax) continue;
+    const ix = Math.min(gs-1, Math.floor((vx - xmin) / spanX * gs));
+    const iz = Math.min(gs-1, Math.floor((vz - zmin) / spanZ * gs));
+    const hAb = vy - floorYCenter;
+    if (hAb >= -band && hAb <= band)         hasFloor[iz*gs+ix] = 1;
+    else if (hAb > obsMinH && hAb < obsMaxH) hasObs  [iz*gs+ix] = 1;
+  }
+
+  // Grille : 0=libre, 1=obstacle, 2=inconnu (pas de données)
+  const grid = new Uint8Array(gs * gs).fill(2);
+  for (let i = 0; i < gs*gs; i++) {
+    if (hasObs[i])        grid[i] = 1;
+    else if (hasFloor[i]) grid[i] = 0;
+  }
+
+  // ── 4. Flood-fill LIBRE depuis la position joueur ──────────────────
+  // Propage les cellules libres vers les cellules inconnues accessibles,
+  // en s'appuyant sur la position courante du joueur comme graine.
+  const cix0 = Math.min(gs-1, Math.max(0, Math.floor((player.pos.x - xmin) / spanX * gs)));
+  const ciz0 = Math.min(gs-1, Math.max(0, Math.floor((player.pos.z - zmin) / spanZ * gs)));
+  // Chercher cellule libre la plus proche du joueur
+  let seedIdx = -1;
+  outer_ff: for (let r = 0; r < gs; r++) {
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+      const nix=cix0+dx, niz=ciz0+dz;
+      if (nix>=0&&nix<gs&&niz>=0&&niz<gs&&grid[niz*gs+nix]===0) { seedIdx=niz*gs+nix; break outer_ff; }
+    }
+  }
+  if (seedIdx >= 0) {
+    const q = [seedIdx];
+    while (q.length > 0) {
+      const c = q.pop();
+      const iz = Math.floor(c/gs), ix = c%gs;
+      for (const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx=ix+dx, nz=iz+dz;
+        if (nx<0||nx>=gs||nz<0||nz>=gs) continue;
+        const ni=nz*gs+nx;
+        if (grid[ni]===2) { grid[ni]=0; q.push(ni); }
+      }
+    }
+  }
+
+  // ── 5. Dilatation des obstacles (marge robot 1 cellule) ───────────
+  const final = grid.slice();
+  for (let iz=0;iz<gs;iz++) for (let ix=0;ix<gs;ix++) {
+    if (grid[iz*gs+ix] !== 1) continue;
+    for (let dz=-1;dz<=1;dz++) for (let dx=-1;dx<=1;dx++) {
+      const niz=iz+dz, nix=ix+dx;
+      if (niz>=0&&niz<gs&&nix>=0&&nix<gs) final[niz*gs+nix] = 1;
+    }
+  }
+  return { grid: final, gs, xmin, xmax, zmin, zmax, spanX, spanZ };
+}
+
+function _wToG(wx, wz, occ) {
+  return [
+    Math.max(0, Math.min(occ.gs-1, Math.floor((wx-occ.xmin)/occ.spanX*occ.gs))),
+    Math.max(0, Math.min(occ.gs-1, Math.floor((wz-occ.zmin)/occ.spanZ*occ.gs))),
+  ];
+}
+function _gToW(ix, iz, occ) {
+  return [occ.xmin+(ix+0.5)/occ.gs*occ.spanX, occ.zmin+(iz+0.5)/occ.gs*occ.spanZ];
+}
+
+// Ligne de vue Bresenham
+function _los(x1, z1, x2, z2, occ) {
+  let [ix,iz] = _wToG(x1,z1,occ), [ex,ez] = _wToG(x2,z2,occ);
+  const gs = occ.gs;
+  const dx=Math.abs(ex-ix), dz=Math.abs(ez-iz);
+  const sx=ix<ex?1:-1, sz=iz<ez?1:-1;
+  let err = dx - dz;
+  for(;;) {
+    if (occ.grid[iz*gs+ix]) return false;
+    if (ix===ex && iz===ez) return true;
+    const e2=2*err;
+    if (e2>-dz){err-=dz;ix+=sx;}
+    if (e2< dx){err+=dx;iz+=sz;}
+  }
+}
+
+// A* 8-directionnel + lissage ligne de vue
+function astarPath(startX, startZ, endX, endZ) {
+  if (!occGrid) occGrid = buildOccGrid(64);
+  if (!occGrid) return null;
+  const occ=occGrid, gs=occ.gs;
+  const [sx,sz] = _wToG(startX, startZ, occ);
+  let [ex,ez]   = _wToG(endX,   endZ,   occ);
+
+  // Déjà à destination (même cellule)
+  if (sx===ex && sz===ez) return null;
+
+  // Débloquer destination si obstacle
+  if (occ.grid[ez*gs+ex]) {
+    let found=false;
+    for (let r=1; r<=8&&!found; r++)
+      for (let dz=-r; dz<=r&&!found; dz++) for (let dx=-r; dx<=r&&!found; dx++) {
+        const niz=ez+dz, nix=ex+dx;
+        if(niz>=0&&niz<gs&&nix>=0&&nix<gs&&!occ.grid[niz*gs+nix]){ex=nix;ez=niz;found=true;}
+      }
+    if (!found) return null;
+  }
+  // Débloquer départ si obstacle
+  let bsx=sx, bsz=sz;
+  if (occ.grid[sz*gs+sx]) {
+    let found2=false;
+    for (let r=1; r<=8&&!found2; r++)
+      for (let dz=-r; dz<=r&&!found2; dz++) for (let dx=-r; dx<=r&&!found2; dx++) {
+        const niz=bsz+dz, nix=bsx+dx;
+        if(niz>=0&&niz<gs&&nix>=0&&nix<gs&&!occ.grid[niz*gs+nix]){bsx=nix;bsz=niz;found2=true;}
+      }
+    if (!found2) return null;
+  }
+
+  const g   = new Float32Array(gs*gs).fill(Infinity);
+  const par = new Int32Array(gs*gs).fill(-1);
+  const vis = new Uint8Array(gs*gs);
+  const heur = (x,z) => Math.hypot(x-ex, z-ez);
+
+  g[bsz*gs+bsx] = 0;
+  const heap = new MinHeap();
+  heap.push(bsz*gs+bsx, heur(bsx,bsz));
+
+  const D=[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+  const C=[Math.SQRT2,1,Math.SQRT2,1,1,Math.SQRT2,1,Math.SQRT2];
+
+  while (heap.size > 0) {
+    const cur = heap.pop();
+    if (vis[cur]) continue; vis[cur]=1;
+    const ciz=Math.floor(cur/gs), cix=cur%gs;
+    if (cix===ex && ciz===ez) break;
+    for (let d=0; d<8; d++) {
+      const nx=cix+D[d][0], nz=ciz+D[d][1];
+      if (nx<0||nx>=gs||nz<0||nz>=gs) continue;
+      const ni=nz*gs+nx;
+      if (occ.grid[ni]||vis[ni]) continue;
+      const ng=g[cur]+C[d];
+      if (ng<g[ni]) { g[ni]=ng; par[ni]=cur; heap.push(ni, ng+heur(nx,nz)); }
+    }
+  }
+
+  const ei=ez*gs+ex;
+  if (g[ei]===Infinity) return null;
+  const gpath=[];
+  for (let c=ei; c!==-1; c=par[c]) gpath.push(c);
+  gpath.reverse();
+  const wpath = gpath.map(i => _gToW(i%gs, Math.floor(i/gs), occ));
+
+  // Lissage ligne de vue
+  if (wpath.length <= 2) return wpath;
+  const smooth = [wpath[0]];
+  let anchor = 0;
+  for (let i=2; i<wpath.length; i++) {
+    if (!_los(wpath[anchor][0],wpath[anchor][1], wpath[i][0],wpath[i][1], occ)) {
+      smooth.push(wpath[i-1]); anchor=i-1;
+    }
+  }
+  smooth.push(wpath[wpath.length-1]);
+  return smooth.length >= 2 ? smooth : wpath.length >= 2 ? wpath : null;
+}
+
+function clearPath() {
+  if (pathLine) {
+    scene.remove(pathLine);
+    if (pathLine._geo) pathLine._geo.dispose();
+    if (pathLine._mat) pathLine._mat.dispose();
+    pathLine = null;
+  }
+  activePath = null;
+  pathTarget = null;
+  const hint = document.getElementById('hud-path-hint');
+  if (hint) hint.style.display = 'none';
+}
+
+function showPathToSalle(s) {
+  clearPath();
+  if (!sceneObject || !heightMap) { renderer.domElement.requestPointerLock(); return; }
+  if (!occGrid) occGrid = buildOccGrid(64);
+
+  const end = salleToWorld(s);
+  const path = astarPath(player.pos.x, player.pos.z, end.x, end.z);
+  if (!path || path.length < 2) { renderer.domElement.requestPointerLock(); return; }
+
+  // ── Géométrie flèche dans le plan XZ (pointe vers +Z), y = 0 ──────
+  // 7 sommets formant une flèche directionnelle (type "chevron plein")
+  const hw = 0.38, ht = 0.60;
+  const av = new Float32Array([
+     0,      0,  ht,           // 0 — pointe avant
+     hw,     0, -ht * 0.3,    // 1 — épaule droite
+     hw*0.4, 0, -ht * 0.3,   // 2 — col droit
+     hw*0.4, 0, -ht,          // 3 — coin base droite
+    -hw*0.4, 0, -ht,          // 4 — coin base gauche
+    -hw*0.4, 0, -ht * 0.3,   // 5 — col gauche
+    -hw,     0, -ht * 0.3,    // 6 — épaule gauche
+  ]);
+  const ai = [0,1,2, 0,2,3, 0,3,4, 0,4,5, 0,5,6];
+  const arrowGeo = new THREE.BufferGeometry();
+  arrowGeo.setAttribute('position', new THREE.BufferAttribute(av, 3));
+  arrowGeo.setIndex(ai);
+  const arrowMat = new THREE.MeshBasicMaterial({ color: 0xff2222, side: THREE.DoubleSide });
+
+  const arrowLift = 0.1; // offset fixe au-dessus du sol local
+  const arrowBaseY = 0;
+
+  const group = new THREE.Group();
+  const SPACING = 0.75; // distance entre deux flèches (unités world)
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const [ax, az] = path[i];
+    const [bx, bz] = path[i + 1];
+    const dx = bx - ax, dz = bz - az;
+    const dist = Math.hypot(dx, dz);
+    const steps = Math.max(1, Math.floor(dist / SPACING));
+    const angle = Math.atan2(dx, dz); // rotation Y pour pointer dans (dx,dz)
+    for (let j = 0; j < steps; j++) {
+      const t = (j + 0.5) / steps;
+      const wx = ax + dx * t, wz = az + dz * t;
+      let wy = arrowBaseY;
+      if (heightMap) { const h = heightMap.sample(wx, wz); if (h !== null && isFinite(h)) wy = Math.max(arrowBaseY, h + arrowLift); }
+      const mesh = new THREE.Mesh(arrowGeo, arrowMat);
+      mesh.position.set(wx, wy, wz);
+      mesh.rotation.y = angle;
+      group.add(mesh);
+    }
+  }
+
+  group._geo = arrowGeo;
+  group._mat = arrowMat;
+  scene.add(group);
+  pathLine = group;
+
+  activePath = path;
+  pathTarget = s;
+  const hint = document.getElementById('hud-path-hint');
+  if (hint) hint.style.display = 'flex';
+
+  renderer.domElement.requestPointerLock();
+}
+
+function checkPathArrival() {
+  if (!pathTarget || !sceneObject) return;
+  const wp = salleToWorld(pathTarget);
+  const dx = wp.x - player.pos.x, dz = wp.z - player.pos.z;
+  const thresh = (sallesData && sallesData.proximite_seuil ? sallesData.proximite_seuil : 6) * 0.4;
+  if (dx*dx + dz*dz < thresh*thresh) clearPath();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  RECHERCHE DE SALLES (menu ESC)
 // ═══════════════════════════════════════════════════════════════════════
 function updateSalleSearch(query) {
@@ -1125,8 +1639,8 @@ function updateSalleSearch(query) {
     item.innerHTML =
       `<span><span class="salle-result-id">${s.id || s.nom}</span>`
       + (s.description ? ` <span style="color:var(--dim);font-size:.55rem">— ${s.description}</span>` : '')
-      + `</span><span class="salle-result-tp">↩ Téléporter</span>`;
-    item.addEventListener('click', () => teleportToSalle(s));
+      + `</span><span class="salle-result-tp">↩ Naviguer</span>`;
+    item.addEventListener('click', () => showPathToSalle(s));
     results.appendChild(item);
   }
 }
@@ -1156,6 +1670,8 @@ function handleFile(file) {
         const loader = new PLYLoader();
         const parsed = loader.parse(e.target.result);
         setProgress('CONSTRUCTION SCÈNE…', 85);
+        worldFlipped = true;
+        document.getElementById('btn-flip').classList.add('active');
         setTimeout(()=> loadParsed(parsed), 30);
       } catch(err) {
         hideProgress();
@@ -1187,6 +1703,7 @@ function animate() {
   renderSalleLabels();
   drawMinimap();
   updateProxNotif();
+  checkPathArrival();
   if (sceneObject) {
     document.getElementById('hud-coords').textContent =
       `X ${player.pos.x.toFixed(3)}   Y ${player.pos.y.toFixed(3)}   Z ${player.pos.z.toFixed(3)}`;
@@ -1196,6 +1713,7 @@ function animate() {
 initScene();
 initMinimap();
 animate();
+loadSpacesIndex(); // découverte automatique des espaces dans database/index.json
 </script>
 </body>
 </html>
