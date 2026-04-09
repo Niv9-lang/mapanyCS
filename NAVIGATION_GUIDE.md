@@ -93,7 +93,7 @@ http://127.0.0.1:5000/pathfinding : trajectoires entre deux points en tenant com
 
 Il est nécessaire de créer à la racine du projet `/map-anything` un dossier "database" où se trouvera les fichiers de reconstruction 3D `.ply` ainsi que les fichiers `.json`associés. Attention, ces deux derniers fichiers doivent porter le même nom pour qu'on les associe.
 
-Ensuite, il faut lancer un serveur web local (votre ordinateur devient ce serveur) à l'aide de la commande `python -m http.server`. La page internet de navigation sera ensuite disponible à l'adresse `http://localhost:8080/PLY_explorer.html`.
+Ensuite, il faut lancer un serveur web local (votre ordinateur devient ce serveur) à l'aide de la commande `python -m http.server 8080`. La page internet de navigation sera ensuite disponible à l'adresse `http://localhost:8080/PLY_explorer.html`.
 
 Les fichiers en `.json`permettent d'annoter les positions XYZ de chaque salle pour les localiser dans les fichiers `.ply`.
 
