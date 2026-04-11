@@ -131,18 +131,19 @@ Pour lancer un benchmark avec un dossier à spécifier :
 ```
 python benchmark.py --image_folder img_mapanything/
 ```
-Métriques mesurées :
+Métriques mesurées (en fonction du nombre d'images utilisées par la reconstruction) :
 
 Temps total (secondes)
 RAM pic & moyenne (Go)
 CPU pic & moyenne (%)
 GPU mémoire pic (Go) — NVIDIA uniquement via pynvml
-Nombre de points reconstruits (lu dans l'en-tête PLY)
 
-Les données sont enregistrés dans un fichier json nommé all_results.json	
+Lors du lancement de benchmark.py, il est demandé à l'utilisateur de rentrer le nom de son ordinateur. 
+Les fichiers .ply créés pour le benchmark ne sont pas enregistrés sur en local.
+
+Les résultats de performance sont enregistrés dans un fichier json nommé all_results.json	
 
 Pour comparer les performances :
-
 ```
 python benchmark.py --compare
 ```
