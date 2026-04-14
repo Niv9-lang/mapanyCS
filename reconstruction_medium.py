@@ -45,26 +45,27 @@ args = parser.parse_args()
 
 set_of_images = args.image_folder
 if not os.path.isdir(set_of_images):
-    print(f"✗ Dossier introuvable: {set_of_images}")
+    print(f"[ERROR] Folder not found: {set_of_images}")
     print("  Placez vos images dans un dossier (ex: img_mapanything/) ou utilisez --image_folder")
     sys.exit(1)
 
 views = load_images(set_of_images)
-print(f"✓ {len(views)} images chargées depuis {set_of_images}")
+print(f"[OK] {len(views)} images loaded from {set_of_images}")
 if len(views) == 0:
-    print("✗ Aucune image trouvée!")
+    print("[ERROR] No images found!")
     sys.exit(1) 
 
 
 # 4. Running Inference with Optimized Parameters
 predictions = model.infer(
     views,                            # Input views
-    memory_efficient_inference=False, # Trades off speed for more views (up to 2000 views on 140 GB)
+    memory_efficient_inference=True,  # Reduce GPU memory usage for multi-view batches
+    minibatch_size=1,                 # Smallest memory footprint on limited VRAM
     use_amp=True,                     # Use mixed precision inference (recommended)
     amp_dtype="bf16",                 # bf16 inference (recommended; falls back to fp16 if bf16 not supported)
     apply_mask=True,                  # Apply masking to dense geometry outputs
     mask_edges=True,                  # Remove edge artifacts by using normals and depth
-    apply_confidence_mask=False,      # Filter low-confidence regions
+    apply_confidence_mask=True,      # Filter low-confidence regions
     confidence_percentile=10,         # Remove bottom 10 percentile confidence pixels
 )
 
@@ -130,7 +131,7 @@ def merge_all_views_to_pointcloud(predictions, apply_mask=True, verbose=True):
     merged_colors = np.vstack(all_colors)
     
     if verbose:
-        print(f"\n✅ Total merged points: {merged_points.shape[0]:,}")
+        print(f"\n[OK] Total merged points: {merged_points.shape[0]:,}")
     
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(merged_points)
@@ -146,7 +147,7 @@ if not args.no_visualize:
     o3d.visualization.draw_geometries([pcd_complete], window_name="Complete 3D Reconstruction")
 
 o3d.io.write_point_cloud(args.output, pcd_complete)
-print(f"\n✓ Reconstruction sauvegardée: {args.output}")
+print(f"\n[OK] Reconstruction saved: {args.output}")
 
 # ── Sauvegarde des poses pour la localisation visuelle ──────────────
 # Récupère les fichiers images dans le même ordre que load_images (tri alpha)
@@ -178,6 +179,6 @@ for i, img_path in enumerate(img_files):
 poses_path = os.path.join(set_of_images, "poses.json")
 with open(poses_path, "w") as f:
     json.dump(poses, f, indent=2)
-print(f"✓ Poses sauvegardées : {poses_path}  ({len(poses)} images)")
-print(f"\n  → Pour la localisation, lancer le serveur avec :")
+print(f"[OK] Poses saved: {poses_path}  ({len(poses)} images)")
+print("\n  -> For localization, run:")
 print(f"     python Navigation/navigation_obstacle.py --model {args.output} --ref-dir {set_of_images}")

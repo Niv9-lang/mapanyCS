@@ -193,7 +193,7 @@ class ModelNavigator:
                           "max": [float(v[:,1].max()), float(v[:,2].max())]},
             "vertices_xz": s[:, [0, 2]].tolist(),
             "vertices_xy": s[:, [0, 1]].tolist(),
-            "vertices_yz": s[:, [1, 2]].tolist(),
+            "vertices_yz": s[:, [1, 2]].tolist()
         }
 
     def get_floor_info(self) -> Dict:
