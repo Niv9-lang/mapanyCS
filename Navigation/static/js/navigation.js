@@ -466,7 +466,19 @@ class SceneNavigator {
                 }
                 break;
             }
+            case 'u':
+                event.preventDefault();
+                this.toggleHUD();
+                break;
         }
+    }
+
+    toggleHUD() {
+        const hud = document.getElementById('hud');
+        const minimap = document.getElementById('minimap-container');
+        const hidden = hud.style.display === 'none';
+        hud.style.display = hidden ? '' : 'none';
+        if (minimap) minimap.style.display = hidden ? '' : 'none';
     }
 
     resetView() {

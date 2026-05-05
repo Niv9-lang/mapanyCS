@@ -164,6 +164,46 @@
   #file-proto-warn code { background:rgba(255,255,255,.08); border-radius:3px; padding:.05rem .35rem; font-family:'Space Mono',monospace; color:#fff; }
   #manual-load-link { font-size:.6rem; color:var(--dim); cursor:pointer; text-decoration:underline; margin-top:.2rem; display:none; }
   #manual-load-link:hover { color:var(--accent2); }
+
+  /* TRANSITIONS (ascenseurs / escaliers) */
+  .transition-label { position:absolute; transform:translate(-50%,-50%); pointer-events:none; display:none; }
+  .transition-bubble {
+    background: rgba(80,50,0,.88);
+    border: 2px solid #f0c040;
+    border-radius:5px;
+    padding:.35rem 1.1rem;
+    white-space:nowrap;
+    transition:background .25s,border-color .25s,box-shadow .25s;
+    box-shadow:0 0 10px rgba(240,192,64,.35);
+  }
+  .transition-bubble.proche {
+    background:rgba(120,80,0,.92);
+    border-color:#ffe066;
+    box-shadow:0 0 16px rgba(255,220,80,.6);
+  }
+  .transition-id { display:block; font-size:.68rem; font-weight:700; color:#ffe066; letter-spacing:.07em; text-align:center; }
+  .transition-nom { display:block; font-size:.54rem; color:rgba(255,220,128,.7); margin-top:2px; text-align:center; }
+
+  /* NOTIFICATION TRANSITION */
+  #transition-notif { position:fixed; bottom:4.2rem; left:50%; transform:translateX(-50%); background:rgba(8,12,18,.9); border:1px solid #f0c040; border-radius:10px; padding:.45rem 1.4rem; font-size:.72rem; color:#f0c040; letter-spacing:.07em; pointer-events:none; z-index:48; white-space:nowrap; opacity:0; transition:opacity .35s; }
+  #transition-notif.visible { opacity:1; }
+
+  /* MENU TRANSITION (touche L) */
+  #transition-menu { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(8,12,18,.78); backdrop-filter:blur(10px); z-index:70; opacity:0; pointer-events:none; transition:opacity .25s; }
+  #transition-menu.visible { opacity:1; pointer-events:all; }
+  .tm-card { background:rgba(10,14,22,.92); border:1px solid #f0c040; border-radius:14px; padding:1.4rem 1.8rem; display:flex; flex-direction:column; gap:.85rem; min-width:300px; max-width:420px; }
+  .tm-title { font-family:'Syne',sans-serif; font-size:1rem; font-weight:800; color:#f0c040; text-align:center; }
+  .tm-sub { font-size:.6rem; color:var(--dim); text-align:center; letter-spacing:.1em; margin-top:-.4rem; }
+  .tm-dest-list { display:flex; flex-direction:column; gap:.4rem; max-height:260px; overflow-y:auto; }
+  .tm-dest-list::-webkit-scrollbar { width:3px; }
+  .tm-dest-list::-webkit-scrollbar-thumb { background:rgba(240,192,64,.3); }
+  .tm-dest-item { background:rgba(240,192,64,.07); border:1px solid rgba(240,192,64,.25); border-radius:7px; padding:.55rem 1rem; font-size:.68rem; color:var(--text); cursor:pointer; transition:background .15s,border-color .15s; display:flex; align-items:center; gap:.7rem; }
+  .tm-dest-item:hover { background:rgba(240,192,64,.16); border-color:#f0c040; color:#f0c040; }
+  .tm-dest-icon { font-size:.9rem; }
+  .tm-dest-name { flex:1; font-family:'Syne',sans-serif; font-weight:700; }
+  .tm-dest-hint { font-size:.52rem; color:var(--dim); }
+  .tm-close { font-size:.6rem; color:var(--dim); text-align:center; letter-spacing:.08em; cursor:pointer; margin-top:.2rem; }
+  .tm-close:hover { color:var(--text); }
 </style>
 </head>
 <body>
@@ -223,6 +263,17 @@
   </div>
 </div>
 <div id="prox-notif"></div>
+<div id="transition-notif"></div>
+
+<!-- MENU TRANSITION (touche L) -->
+<div id="transition-menu">
+  <div class="tm-card">
+    <div class="tm-title" id="tm-title">↕ Accès multi-niveaux</div>
+    <div class="tm-sub">Choisissez un niveau à rejoindre</div>
+    <div class="tm-dest-list" id="tm-dest-list"></div>
+    <div class="tm-close" id="tm-close">Appuyez sur <strong>L</strong> ou <strong>ESC</strong> pour fermer</div>
+  </div>
+</div>
 
 <div id="crosshair"></div>
 
@@ -243,8 +294,8 @@
       <span class="val" id="fov-val">75°</span>
     </div>
     <div class="pm-btns">
-      <button class="btn-toggle" id="btn-flip" onclick="flipWorld()"> 180° : Flip monde <small style="opacity:.5">[F]</small></button>
-      <button class="btn-toggle" id="btn-noclip" onclick="toggleNoclip()">👻 Noclip <small style="opacity:.5">[N]</small></button>
+      <button class="btn-toggle" id="btn-up" onclick="cycleUpAxis()">Axe haut : <span id="up-label">Y↓</span> <small style="opacity:.5">[G]</small></button>
+      <button class="btn-toggle" id="btn-noclip" onclick="toggleNoclip()">Noclip <small style="opacity:.5">[N]</small></button>
     </div>
     <div style="border-top:1px solid rgba(80,160,255,.12);margin:.2rem 0;"></div>
     <div class="pm-row" style="justify-content:space-between;align-items:center;">
@@ -254,7 +305,7 @@
     </div>
     <input type="file" id="salles-input-pm" accept=".json" style="display:none">
     <div class="pm-search">
-      <input type="text" id="salle-search" placeholder="🔍 Rechercher une salle…" autocomplete="off" spellcheck="false">
+      <input type="text" id="salle-search" placeholder="Rechercher une salle…" autocomplete="off" spellcheck="false">
       <div id="salle-results"></div>
     </div>
     <div id="pm-spaces-section">
@@ -280,6 +331,7 @@
   <div class="hud-row"><span class="key">SPC</span> Sauter &nbsp; <span class="key">⇧</span> Sprint</div>
   <div class="hud-row"><span class="key">N</span> Noclip (traverser murs)</div>
   <div class="hud-row" id="hud-path-hint" style="display:none"><span class="key" style="color:var(--accent2);border-color:var(--accent2)">C</span> <span style="color:var(--accent2)">Annuler le chemin</span></div>
+  <div class="hud-row" id="hud-transition-hint" style="display:none"><span class="key" style="color:#f0c040;border-color:#f0c040">L</span> <span style="color:#f0c040">Accès niveau ↕</span></div>
   <div class="hud-row" id="hud-noclip-hint" style="display:none;color:var(--accent)"><span class="key" style="color:var(--accent);border-color:var(--accent)">SPC</span>↑ &nbsp;<span class="key" style="color:var(--accent);border-color:var(--accent)">⇧</span>↓ &nbsp;voler librement</div>
   <div class="hud-row"><span class="key">ESC</span> Libérer souris</div>
   <div id="hud-coords">X — &nbsp; Y — &nbsp; Z —</div>
@@ -438,7 +490,7 @@ class PLYLoader {
 class HeightMap {
   constructor(verts, res = 256) {
     this.res = res;
-    // Bounding box XZ
+    // Bounding box XZ + Y
     let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
     let minY=Infinity,maxY=-Infinity;
     for(let i=0;i<verts.length;i+=3){
@@ -451,43 +503,67 @@ class HeightMap {
     this.minY=minY; this.maxY=maxY;
     const pad=0.01;
     this.spanX=(maxX-minX)||pad; this.spanZ=(maxZ-minZ)||pad;
+    const yRange=(maxY-minY)||pad;
 
-    // Two grids: floor (max Y from below) and ceiling (min Y from above)
-    // We use a percentile approach: collect all Y per cell, take low pct for floor
+    // ── Percentile 2% → niveau global du sol robuste aux artefacts ─────────
+    // On trie les Y et on prend le 2e percentile : ignore les 2% de points
+    // parasites sous le vrai sol (artefacts CloudCompare, zones de recouvrement).
+    // Plus fiable qu'un histogramme pour les PLY fusionnés.
+    const nPts = Math.floor(verts.length / 3);
+    const yArr = new Float32Array(nPts);
+    for(let i=0;i<nPts;i++) yArr[i] = verts[i*3+1];
+    yArr.sort();
+    const p02 = yArr[Math.max(0, Math.floor(nPts * 0.02))]; // 2e percentile = sol
+    const p98 = yArr[Math.min(nPts-1, Math.floor(nPts * 0.98))]; // 98e percentile = plafond
+    this.floorY = p02;
+    this.ceilApprox = p98;
+    const BAND = (p98 - p02) * 0.08;  // bande ±8 % de la plage sol→plafond
+
+    // ── Construction des grilles par cellule XZ ──────────────────────────
     const cells = res * res;
-    // Store min/max per cell quickly
-    // For indoor rooms: MIN Y = floor, MAX Y = ceiling
-    // For outdoor terrain: MAX Y = ground surface
-    const minGrid = new Float32Array(cells).fill(+Infinity);
-    const maxGrid = new Float32Array(cells).fill(-Infinity);
+    // floorRaw : Y le plus proche de floorY dans la bande BAND (sol réel)
+    // Si aucun point dans la bande, on garde le minimum (murs / couloir étroit)
+    const floorRaw  = new Float32Array(cells).fill(+Infinity);
+    const floorDist = new Float32Array(cells).fill(+Infinity);
+    const minGrid   = new Float32Array(cells).fill(+Infinity);
 
     for(let i=0;i<verts.length;i+=3){
       const x=verts[i],y=verts[i+1],z=verts[i+2];
-      const cx = Math.floor((x-minX)/this.spanX * (res-1));
-      const cz = Math.floor((z-minZ)/this.spanZ * (res-1));
-      const idx = cz*res+cx;
-      if(y < minGrid[idx]) minGrid[idx] = y;
-      if(y > maxGrid[idx]) maxGrid[idx] = y;
+      const cx=Math.min(res-1,Math.max(0,Math.floor((x-minX)/this.spanX*(res-1))));
+      const cz=Math.min(res-1,Math.max(0,Math.floor((z-minZ)/this.spanZ*(res-1))));
+      const idx=cz*res+cx;
+      if(y<minGrid[idx]) minGrid[idx]=y;
+      const d=Math.abs(y-this.floorY);
+      if(d<BAND && d<floorDist[idx]){ floorDist[idx]=d; floorRaw[idx]=y; }
     }
+    // Pour les cellules sans point dans la bande, utiliser le minimum brut
+    for(let i=0;i<cells;i++) if(floorRaw[i]===+Infinity && minGrid[i]!==+Infinity) floorRaw[i]=minGrid[i];
 
-    const fillGrid = (src, sentinel) => {
-      const out = new Float32Array(cells).fill(sentinel);
-      for(let iz=0;iz<res;iz++) for(let ix=0;ix<res;ix++){
-        const i=iz*res+ix;
-        if(src[i] !== sentinel){ out[i]=src[i]; continue; }
-        let s=0,n=0;
-        for(let dz=-3;dz<=3;dz++) for(let dx=-3;dx<=3;dx++){
-          const ni=(iz+dz)*res+(ix+dx);
-          if(ni>=0&&ni<cells&&src[ni]!==sentinel){s+=src[ni];n++;}
+    // Propagation itérative (BFS) : chaque passe étend le remplissage d'1 cellule.
+    // 40 passes → atteint jusqu'à 40 cellules de vide (couloirs larges, grandes pièces).
+    const fillGrid = (src, sentinel, passes = 40) => {
+      const grid = src.slice();
+      for(let p = 0; p < passes; p++) {
+        const prev = grid.slice();
+        let changed = false;
+        for(let iz = 0; iz < res; iz++) for(let ix = 0; ix < res; ix++) {
+          const i = iz * res + ix;
+          if(prev[i] !== sentinel) continue;
+          let s = 0, n = 0;
+          for(let dz = -1; dz <= 1; dz++) for(let dx = -1; dx <= 1; dx++) {
+            if(dz === 0 && dx === 0) continue;
+            const ni = (iz+dz)*res + (ix+dx);
+            if(ni >= 0 && ni < cells && prev[ni] !== sentinel){ s += prev[ni]; n++; }
+          }
+          if(n > 0){ grid[i] = s / n; changed = true; }
         }
-        if(n>0) out[i]=s/n;
+        if(!changed) break;
       }
-      return out;
+      return grid;
     };
 
-    this.floorGrid = fillGrid(minGrid, +Infinity);
-    this.ceilGrid  = fillGrid(maxGrid, -Infinity);
-    this.grid = this.floorGrid; // indoor mode by default
+    this.floorGrid = fillGrid(floorRaw, +Infinity);
+    this.grid = this.floorGrid;
     this.mode = 'indoor';
   }
 
@@ -532,8 +608,15 @@ const GRAVITY=-20, JUMP=8, SPEED=10, SPRINT=2.2;
 const rdDown = new THREE.Raycaster();
 let ptsMaterial = null;
 let noclip = false;
-let worldFlipped = false;
+// 0=Y↑  1=Y↓(180°X, défaut)  2=Z↑(-90°X)  3=Z↓(+90°X)  4=X↑(-90°Z)  5=X↓(+90°Z)
+let worldUpPreset = 1;
 let rawParsed = null; // keep original parsed data for re-flip
+
+// ── Transitions (ascenseurs / escaliers) ────────────────────────────────────
+let transitionMarkers = [];   // [{pos, el, data}, …]
+let nearestTransition = null; // transition la plus proche si dans le seuil
+let transitionMenuOpen = false;
+let pendingSpawn = null;      // {x,y,z} à appliquer après chargement d'un espace
 
 // ── Pathfinding A* ──────────────────────────────────────────────────────────
 let occGrid    = null;   // grille d'occupation (réinitialisée à chaque nouveau PLY)
@@ -626,7 +709,7 @@ function loadSallesData(data) {
     const msg = `✓ ${n} salle${n>1?'s':''} chargée${n>1?'s':''}`;
     document.getElementById('salles-status').textContent = msg;
     document.getElementById('pm-salles-count').textContent = `${n} salle${n>1?'s':''}`;
-    if (sceneObject) buildSalleLabels();
+    if (sceneObject) { buildSalleLabels(); buildTransitionMarkers(); }
     updateSalleSearch(document.getElementById('salle-search').value);
   } catch(e) {
     const err = `⚠ Erreur JSON : ${e.message}`;
@@ -728,8 +811,8 @@ async function loadSpaceByDef(def) {
       .then(d => d && loadSallesData(d))
       .catch(() => {});
     await new Promise(r => setTimeout(r, 30));
-    worldFlipped = true;
-    document.getElementById('btn-flip').classList.add('active');
+    worldUpPreset = 1;
+    updateUpButton();
     loadParsed(parsed);
     // Mettre à jour le sélecteur dans le menu pause
     renderPmSpaces(dbSpaces);
@@ -745,11 +828,12 @@ async function switchSpace(def) {
   // Nettoyer la scène sans revenir à l'écran de démarrage
   document.exitPointerLock();
   clearPath(); occGrid = null;
+  closeTransitionMenu(); clearTransitionMarkers();
   if (sceneObject) { scene.remove(sceneObject); sceneObject = null; }
   heightMap = null; meshForRaycast = null; rawParsed = null; sceneBounds = null;
-  worldFlipped = false; noclip = false;
+  worldUpPreset = 1; noclip = false;
   clearSalleLabels(); sallesData = null;
-  document.getElementById('btn-flip').classList.remove('active');
+  updateUpButton();
   document.getElementById('btn-noclip').classList.remove('active');
   document.getElementById('hud-noclip-hint').style.display = 'none';
   document.getElementById('pause-menu').classList.remove('visible');
@@ -799,8 +883,13 @@ function initScene() {
     keys[e.code]=true;
     if(e.code==='Space') e.preventDefault();
     if(e.code==='KeyN') toggleNoclip();
-    if(e.code==='KeyF') flipWorld();
+    if(e.code==='KeyG') cycleUpAxis();
     if(e.code==='KeyC') clearPath();
+    if(e.code==='KeyL') {
+      if (transitionMenuOpen) closeTransitionMenu();
+      else openTransitionMenu();
+    }
+    if(e.code==='Escape' && transitionMenuOpen) closeTransitionMenu();
   });
   window.addEventListener('keyup',   e=>{ keys[e.code]=false; });
 
@@ -862,11 +951,19 @@ function loadParsed(parsed) {
   explorerScale = scale;        // ← mémoriser pour conversion coords salles
   geo.translate(-ctr.x, -ctr.y, -ctr.z); // center on all axes
   geo.scale(scale, scale, scale);
-  if(worldFlipped) {
-    // Apply flip: negate Y and Z (180° around X)
+  if(worldUpPreset !== 0) {
     const pos = geo.attributes.position.array;
-    for(let i=0;i<pos.length;i+=3){ pos[i+1]*=-1; pos[i+2]*=-1; }
-    geo.attributes.position.needsUpdate=true;
+    for(let i = 0; i < pos.length; i += 3) {
+      const x = pos[i], y = pos[i+1], z = pos[i+2];
+      switch(worldUpPreset) {
+        case 1: pos[i+1]=-y; pos[i+2]=-z; break;          // Y↓  180°X
+        case 2: pos[i+1]=z;  pos[i+2]=-y; break;          // Z↑  -90°X
+        case 3: pos[i+1]=-z; pos[i+2]=y;  break;          // Z↓  +90°X
+        case 4: pos[i]=-y;   pos[i+1]=x;  break;          // X↑  -90°Z
+        case 5: pos[i]=y;    pos[i+1]=-x; break;          // X↓  +90°Z
+      }
+    }
+    geo.attributes.position.needsUpdate = true;
   }
   geo.computeBoundingBox();
 
@@ -907,11 +1004,11 @@ function loadParsed(parsed) {
   const nb = geo.boundingBox;
   const cx = (nb.min.x + nb.max.x) / 2;
   const cz2= (nb.min.z + nb.max.z) / 2;
-  let spawnY = nb.min.y + player.height + 0.3; // near floor
-  if(heightMap) {
-    const hy = heightMap.sample(cx, cz2);
-    if(hy !== null) spawnY = hy + player.height + 0.3;
-  }
+  // Spawn : on utilise floorY global (histogramme Y) = niveau sol détecté
+  // automatiquement, fiable même pour les couloirs étroits et les PLY mal orientés.
+  let spawnY = heightMap
+    ? heightMap.floorY + player.height + 0.5
+    : nb.min.y + player.height + 0.3;
   player.pos.set(cx, spawnY, cz2);
   player.vel.set(0,0,0);
   euler.set(0, Math.PI, 0); // face inward
@@ -929,8 +1026,14 @@ function loadParsed(parsed) {
   }
   mm.zoom = 1.0; mm.pan.x = 0; mm.pan.y = 0;
 
-  // Reconstruire les labels de salles avec le nouveau scale/flip
-  if (sallesData) buildSalleLabels();
+  // Reconstruire les labels de salles et transitions
+  if (sallesData) { buildSalleLabels(); buildTransitionMarkers(); }
+
+  // Appliquer le spawn en attente (depuis une transition inter-espaces)
+  if (pendingSpawn) {
+    player.pos.set(pendingSpawn.x, pendingSpawn.y, pendingSpawn.z);
+    pendingSpawn = null;
+  }
 
   hideProgress();
   showExplorer();
@@ -946,10 +1049,17 @@ function toggleNoclip() {
   player.vel.set(0,0,0);
 }
 
-function flipWorld() {
+const UP_LABELS = ['Y↑','Y↓','Z↑','Z↓','X↑','X↓'];
+
+function updateUpButton() {
+  document.getElementById('up-label').textContent = UP_LABELS[worldUpPreset];
+  document.getElementById('btn-up').classList.toggle('active', worldUpPreset !== 0);
+}
+
+function cycleUpAxis() {
   if(!rawParsed) return;
-  worldFlipped = !worldFlipped;
-  document.getElementById('btn-flip').classList.toggle('active', worldFlipped);
+  worldUpPreset = (worldUpPreset + 1) % 6;
+  updateUpButton();
   loadParsed(rawParsed);
 }
 
@@ -999,26 +1109,25 @@ function updatePlayer(dt) {
     if(keys['Space'] && player.onGround){ player.vel.y=JUMP; player.onGround=false; }
     if(!player.onGround) player.vel.y += GRAVITY*dt;
 
-    // ── Wall collision: test future XZ position against heightmap
-    // If the floor at the new position is too high to step up, block that axis
-    if(heightMap && (player.vel.x !== 0 || player.vel.z !== 0)) {
-      const STEP_H = 0.55;
-      const nx = player.pos.x + player.vel.x * dt;
-      const nz = player.pos.z + player.vel.z * dt;
-      // Test X axis
-      const hx = heightMap.sample(nx, player.pos.z);
-      if(hx !== null && hx > player.pos.y + STEP_H) player.vel.x = 0;
-      // Test Z axis
-      const hz = heightMap.sample(player.pos.x, nz);
-      if(hz !== null && hz > player.pos.y + STEP_H) player.vel.z = 0;
-    }
+    // Collision murs désactivée : le sample heightmap par cellule est trop peu
+    // fiable pour les nuages de points avec sol creux (couloirs, CloudCompare).
+    // Les murs sont visibles — l'utilisateur les évite naturellement.
 
+    const prevPosY = player.pos.y;   // Y avant le déplacement (pour détecter le croisement)
     player.pos.addScaledVector(player.vel, dt);
 
     // ── Ground detection
+    // On ne colle au sol que si on le croise par le dessus (vel.y ≤ 0 et on descend vers lui).
+    // Cela empêche de téléporter le joueur vers le plafond quand la heightmap renvoie
+    // une valeur erronée (plafond au lieu du sol).
+    // Sol physique = floorY global (2e percentile du nuage).
+    // On utilise un sol PLAT global plutôt qu'un sample cellule par cellule,
+    // car un couloir reconstruit a très peu de points au sol — la heightmap
+    // par cellule est trop peu fiable pour guider la physique.
+    // Le sample cellule garde son rôle pour la COLLISION MURS seulement.
     let groundY = null;
     if(heightMap) {
-      groundY = heightMap.sample(player.pos.x, player.pos.z);
+      groundY = heightMap.floorY;              // sol plat global, fiable
     } else if(meshForRaycast) {
       rdDown.set(new THREE.Vector3(player.pos.x, player.pos.y+1.5, player.pos.z), new THREE.Vector3(0,-1,0));
       const hits = rdDown.intersectObject(meshForRaycast);
@@ -1037,14 +1146,12 @@ function updatePlayer(dt) {
       player.onGround = false;
     }
 
-    // Fall reset
-    if(heightMap) {
-      if(player.pos.y < heightMap.minY - 8) {
-        const cx=(heightMap.minX+heightMap.maxX)/2, cz=(heightMap.minZ+heightMap.maxZ)/2;
-        const hy = heightMap.sample(cx,cz);
-        player.pos.set(cx, (hy||heightMap.minY) + player.height + 1, cz);
-        player.vel.set(0,0,0);
-      }
+    // Fall reset : trop bas → replacer au centre de la scène, au niveau du sol global
+    if(heightMap && player.pos.y < heightMap.floorY - 5) {
+      const rcx = (heightMap.minX+heightMap.maxX)/2;
+      const rcz = (heightMap.minZ+heightMap.maxZ)/2;
+      player.pos.set(rcx, heightMap.floorY + player.height + 0.5, rcz);
+      player.vel.set(0,0,0);
     }
   }
 
@@ -1103,11 +1210,12 @@ function backToMenu() {
   ['top-bar','hud','pause-menu','crosshair','mm-wrap'].forEach(id=>document.getElementById(id).classList.remove('visible'));
   document.getElementById('prox-notif').classList.remove('visible');
   clearPath(); occGrid = null;
+  closeTransitionMenu(); clearTransitionMarkers();
   if(sceneObject){ scene.remove(sceneObject); sceneObject=null; }
   heightMap=null; meshForRaycast=null; rawParsed=null; sceneBounds=null;
-  worldFlipped=false; noclip=false;
+  worldUpPreset=1; noclip=false;
   clearSalleLabels();
-  document.getElementById('btn-flip').classList.remove('active');
+  updateUpButton();
   document.getElementById('btn-noclip').classList.remove('active');
   document.getElementById('hud-noclip-hint').style.display='none';
 }
@@ -1219,6 +1327,25 @@ function drawMinimap() {
   }
   ctx.textBaseline = 'alphabetic';
 
+  // Transitions — losanges jaunes
+  for (const m of transitionMarkers) {
+    const [sx, sy] = mmWorldToScreen(m.pos.x, m.pos.z);
+    const s = 6; // demi-diagonale du losange en px
+    ctx.save();
+    ctx.shadowColor = '#f0c040'; ctx.shadowBlur = 6;
+    ctx.fillStyle   = '#f0c040';
+    ctx.strokeStyle = '#ffe066'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx,   sy-s);
+    ctx.lineTo(sx+s, sy);
+    ctx.lineTo(sx,   sy+s);
+    ctx.lineTo(sx-s, sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Chemin A* — trait bleu pointillé
   if (activePath && activePath.length >= 2) {
     ctx.save();
@@ -1271,6 +1398,131 @@ function updateProxNotif() {
   } else {
     notif.classList.remove('visible');
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TRANSITIONS — ascenseurs / escaliers
+// ═══════════════════════════════════════════════════════════════════════
+
+function clearTransitionMarkers() {
+  const ov = document.getElementById('salles-overlay');
+  transitionMarkers.forEach(m => { if (m.el.parentNode === ov) ov.removeChild(m.el); });
+  transitionMarkers = [];
+  nearestTransition = null;
+  document.getElementById('hud-transition-hint').style.display = 'none';
+  document.getElementById('transition-notif').classList.remove('visible');
+}
+
+function buildTransitionMarkers() {
+  clearTransitionMarkers();
+  if (!sallesData || !sallesData.transitions || !sallesData.transitions.length) return;
+  const ov = document.getElementById('salles-overlay');
+  for (const t of sallesData.transitions) {
+    const el = document.createElement('div');
+    el.className = 'transition-label';
+    el.innerHTML =
+      `<div class="transition-bubble">`
+      + `<span class="transition-id">↕ ${t.id || t.nom}</span>`
+      + (t.nom && t.nom !== t.id ? `<span class="transition-nom">${t.nom}</span>` : '')
+      + `</div>`;
+    ov.appendChild(el);
+    transitionMarkers.push({ pos: new THREE.Vector3(t.x, t.y, t.z), el, data: t });
+  }
+}
+
+const _tNdcVec = new THREE.Vector3();
+const _tLabelPos = new THREE.Vector3();
+function renderTransitionLabels() {
+  if (!transitionMarkers.length || !sceneObject) return;
+  const W = innerWidth, H = innerHeight;
+  const seuil = (sallesData && sallesData.proximite_seuil ? sallesData.proximite_seuil : 8);
+  const seuilSq = seuil * seuil;
+  const proxOrangeSq = (seuil * 0.5) * (seuil * 0.5);
+
+  nearestTransition = null;
+  let nearestDist = Infinity;
+
+  for (const m of transitionMarkers) {
+    const dx = m.pos.x - camera.position.x;
+    const dz = m.pos.z - camera.position.z;
+    const dist2xz = dx*dx + dz*dz;
+    _tLabelPos.set(m.pos.x, camera.position.y, m.pos.z);
+    _tNdcVec.copy(_tLabelPos).project(camera);
+    const inFront  = _tNdcVec.z < 1.0;
+    const inRange  = dist2xz < seuilSq;
+    const onScreen = Math.abs(_tNdcVec.x) < 1.1 && Math.abs(_tNdcVec.y) < 1.1;
+    if (inFront && inRange && onScreen) {
+      m.el.style.display = 'block';
+      m.el.style.left = ((_tNdcVec.x + 1) / 2 * W) + 'px';
+      m.el.style.top  = ((-_tNdcVec.y + 1) / 2 * H) + 'px';
+      const bubble = m.el.querySelector('.transition-bubble');
+      if (bubble) bubble.classList.toggle('proche', dist2xz < proxOrangeSq);
+    } else {
+      m.el.style.display = 'none';
+    }
+    if (dist2xz < seuilSq && dist2xz < nearestDist) {
+      nearestDist = dist2xz;
+      nearestTransition = m;
+    }
+  }
+
+  const hint    = document.getElementById('hud-transition-hint');
+  const notif   = document.getElementById('transition-notif');
+  if (nearestTransition && !transitionMenuOpen) {
+    hint.style.display = 'flex';
+    notif.classList.add('visible');
+    notif.textContent = `↕ ${nearestTransition.data.nom || nearestTransition.data.id} — appuyez sur L`;
+  } else {
+    hint.style.display = 'none';
+    if (!transitionMenuOpen) notif.classList.remove('visible');
+  }
+}
+
+function openTransitionMenu() {
+  if (!nearestTransition) return;
+  const t = nearestTransition.data;
+  const dests = t.destinations || [];
+  if (!dests.length) return;
+
+  transitionMenuOpen = true;
+  document.exitPointerLock();
+
+  document.getElementById('tm-title').textContent = `↕ ${t.nom || t.id}`;
+  const list = document.getElementById('tm-dest-list');
+  list.innerHTML = '';
+  for (const dest of dests) {
+    const item = document.createElement('div');
+    item.className = 'tm-dest-item';
+    item.innerHTML =
+      `<span class="tm-dest-icon">🏢</span>`
+      + `<span class="tm-dest-name">${dest.nom || fileToLabel(dest.file)}</span>`
+      + `<span class="tm-dest-hint">→ ${dest.file}</span>`;
+    item.addEventListener('click', () => {
+      closeTransitionMenu();
+      // Spawn optionnel dans l'espace destination
+      if (dest.spawn) pendingSpawn = dest.spawn;
+      const def = { file: dest.file, name: dest.nom || fileToLabel(dest.file) };
+      if (def.file === currentFile) {
+        // Même espace — téléporter directement
+        if (pendingSpawn) {
+          player.pos.set(pendingSpawn.x, pendingSpawn.y, pendingSpawn.z);
+          pendingSpawn = null;
+        }
+        renderer.domElement.requestPointerLock();
+      } else {
+        switchSpace(def);
+      }
+    });
+    list.appendChild(item);
+  }
+
+  document.getElementById('transition-menu').classList.add('visible');
+}
+
+function closeTransitionMenu() {
+  transitionMenuOpen = false;
+  document.getElementById('transition-menu').classList.remove('visible');
+  document.getElementById('transition-notif').classList.remove('visible');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1670,8 +1922,8 @@ function handleFile(file) {
         const loader = new PLYLoader();
         const parsed = loader.parse(e.target.result);
         setProgress('CONSTRUCTION SCÈNE…', 85);
-        worldFlipped = true;
-        document.getElementById('btn-flip').classList.add('active');
+        worldUpPreset = 1;
+        updateUpButton();
         setTimeout(()=> loadParsed(parsed), 30);
       } catch(err) {
         hideProgress();
@@ -1701,6 +1953,7 @@ function animate() {
   updatePlayer(dt);
   renderer.render(scene, camera);
   renderSalleLabels();
+  renderTransitionLabels();
   drawMinimap();
   updateProxNotif();
   checkPathArrival();
@@ -1714,6 +1967,7 @@ initScene();
 initMinimap();
 animate();
 loadSpacesIndex(); // découverte automatique des espaces dans database/index.json
+document.getElementById('tm-close').addEventListener('click', closeTransitionMenu);
 </script>
 </body>
 </html>

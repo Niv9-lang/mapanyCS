@@ -197,6 +197,8 @@ canvas {
     background: #1a1a2e;
     border: 1px solid #0066ff;
     border-radius: 4px;
+    width: 175px;
+    height: 175px;
 }
 
 #minimap-legend {
