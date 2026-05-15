@@ -239,7 +239,7 @@
     <input type="file" id="file-input" accept=".ply">
   </div>
   <div class="or-sep" id="or-demo-sep">ou</div>
-  <button class="btn-ghost" id="btn-demo">🎲 Scène de démonstration</button>
+  <button class="btn-ghost" id="btn-demo">Scène de démonstration</button>
   <input type="file" id="salles-input" accept=".json" style="display:none">
   <div id="salles-status"></div>
 </div>
@@ -301,7 +301,7 @@
     <div class="pm-row" style="justify-content:space-between;align-items:center;">
       <span style="font-size:.6rem;color:var(--dim)">Salles :</span>
       <span id="pm-salles-count" style="font-size:.6rem;color:var(--accent2)">aucune</span>
-      <button class="btn-toggle" id="btn-pm-salles" style="padding:.3rem .7rem;font-size:.6rem">📍 Charger JSON</button>
+      <button class="btn-toggle" id="btn-pm-salles" style="padding:.3rem .7rem;font-size:.6rem">Charger JSON</button>
     </div>
     <input type="file" id="salles-input-pm" accept=".json" style="display:none">
     <div class="pm-search">
@@ -488,7 +488,7 @@ class PLYLoader {
 //  HEIGHT MAP — grille 2D pour la collision au sol (nuage de points)
 // ═══════════════════════════════════════════════════════════════════════
 class HeightMap {
-  constructor(verts, res = 256) {
+  constructor(verts, res = 256, floorOverride = null) {
     this.res = res;
     // Bounding box XZ + Y
     let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
@@ -505,19 +505,47 @@ class HeightMap {
     this.spanX=(maxX-minX)||pad; this.spanZ=(maxZ-minZ)||pad;
     const yRange=(maxY-minY)||pad;
 
-    // ── Percentile 2% → niveau global du sol robuste aux artefacts ─────────
-    // On trie les Y et on prend le 2e percentile : ignore les 2% de points
-    // parasites sous le vrai sol (artefacts CloudCompare, zones de recouvrement).
-    // Plus fiable qu'un histogramme pour les PLY fusionnés.
+    // ── Détection sol par histogramme Y (robuste pour sols plats sur XY) ──
+    // On cherche le pic de densité dans les 25 % inférieurs du nuage :
+    // un sol horizontal concentre beaucoup de points à un même Y.
+    // Plus fiable que le 2e percentile pour les PLY CloudCompare et les
+    // couloirs étroits où le sol a peu de points mais forme un pic net.
     const nPts = Math.floor(verts.length / 3);
     const yArr = new Float32Array(nPts);
     for(let i=0;i<nPts;i++) yArr[i] = verts[i*3+1];
     yArr.sort();
-    const p02 = yArr[Math.max(0, Math.floor(nPts * 0.02))]; // 2e percentile = sol
-    const p98 = yArr[Math.min(nPts-1, Math.floor(nPts * 0.98))]; // 98e percentile = plafond
-    this.floorY = p02;
-    this.ceilApprox = p98;
-    const BAND = (p98 - p02) * 0.08;  // bande ±8 % de la plage sol→plafond
+    const N_HIST = 100;
+    const yhist = new Float64Array(N_HIST);
+    for(let i=0;i<nPts;i++){
+      const b=Math.min(N_HIST-1,Math.floor((yArr[i]-minY)/yRange*N_HIST));
+      yhist[b]++;
+    }
+    // Lissage fenêtre 5 pour éliminer le bruit
+    const yhs = new Float64Array(N_HIST);
+    for(let b=0;b<N_HIST;b++){
+      let s=0,n=0;
+      for(let d=-2;d<=2;d++){const nb=b+d;if(nb>=0&&nb<N_HIST){s+=yhist[nb];n++;}}
+      yhs[b]=s/n;
+    }
+    // Sol = pic dominant dans les 25 % inférieurs
+    const floorTopBin=Math.floor(N_HIST*0.25);
+    let floorBin=0;
+    for(let b=1;b<floorTopBin;b++) if(yhs[b]>yhs[floorBin]) floorBin=b;
+    const p03=yArr[Math.max(0,Math.floor(nPts*0.03))];
+    const peakDensity=nPts>0?yhs[floorBin]/nPts:0;
+    // Plafond = pic dominant dans les 25 % supérieurs
+    const ceilBotBin=Math.floor(N_HIST*0.75);
+    let ceilBin=N_HIST-1;
+    for(let b=N_HIST-2;b>=ceilBotBin;b--) if(yhs[b]>yhs[ceilBin]) ceilBin=b;
+    this.ceilApprox = minY+(ceilBin+0.5)/N_HIST*yRange;
+    // Sol : override JSON prioritaire, sinon pic d'histogramme, sinon p03
+    // floorOverride = offset Three.js depuis minY (0 = sol au fond, -1 = 1 unité plus bas)
+    if(floorOverride !== null) {
+      this.floorY = minY + floorOverride;
+    } else {
+      this.floorY = peakDensity>0.003 ? minY+(floorBin+0.5)/N_HIST*yRange : p03;
+    }
+    const BAND = (this.ceilApprox-this.floorY)*0.08;
 
     // ── Construction des grilles par cellule XZ ──────────────────────────
     const cells = res * res;
@@ -604,7 +632,8 @@ let meshForRaycast = null;
 const player = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), onGround: false, height: 1.7 };
 const euler  = new THREE.Euler(0,0,0,'YXZ');
 const keys   = {};
-const GRAVITY=-20, JUMP=8, SPEED=10, SPRINT=2.2;
+const GRAVITY=-20, SPRINT=2.2;
+let JUMP=8, SPEED=10;
 const rdDown = new THREE.Raycaster();
 let ptsMaterial = null;
 let noclip = false;
@@ -629,7 +658,9 @@ let pathTarget = null;   // objet salle de destination
 // ═══════════════════════════════════════════════════════════════════════
 let sallesData    = null;   // données brutes du JSON
 let salleMarkers  = [];     // [{pos, el, data}, ...]
-let explorerScale = 1;      // facteur 30/maxD appliqué lors du chargement PLY
+let explorerScale   = 1;    // facteur 30/maxD appliqué lors du chargement PLY
+let floorYOverride    = null; // fraction [0-1] depuis le JSON (null = détection auto)
+let pointSizeOverride = null; // taille points Three.js (ex: 0.06) depuis le JSON
 let sceneBounds   = null;   // {xmin,xmax,zmin,zmax} de la scène chargée
 let minimapCtx    = null;
 let minimapVerts  = [];   // [[x, z], …] subsamplé en coordonnées monde
@@ -706,13 +737,13 @@ function loadSallesData(data) {
     if (!sallesData.salles || !Array.isArray(sallesData.salles))
       throw new Error('Clé "salles" manquante ou invalide');
     const n = sallesData.salles.length;
-    const msg = `✓ ${n} salle${n>1?'s':''} chargée${n>1?'s':''}`;
+    const msg = `${n} salle${n>1?'s':''} chargée${n>1?'s':''}`;
     document.getElementById('salles-status').textContent = msg;
     document.getElementById('pm-salles-count').textContent = `${n} salle${n>1?'s':''}`;
     if (sceneObject) { buildSalleLabels(); buildTransitionMarkers(); }
     updateSalleSearch(document.getElementById('salle-search').value);
   } catch(e) {
-    const err = `⚠ Erreur JSON : ${e.message}`;
+    const err = `Erreur JSON : ${e.message}`;
     document.getElementById('salles-status').textContent = err;
     document.getElementById('pm-salles-count').textContent = 'erreur';
   }
@@ -738,14 +769,20 @@ async function loadSpacesIndex() {
   }
   try {
     const resp = await fetch('database/index.json');
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      console.error('[PLY Explorer] database/index.json HTTP', resp.status, resp.statusText);
+      return;
+    }
     const data = await resp.json();
+    console.log('[PLY Explorer] index.json chargé :', data);
     const files = data.files || [];
-    if (!files.length) return;
+    if (!files.length) { console.warn('[PLY Explorer] index.json : liste vide'); return; }
     dbSpaces = files.map(f => ({ file: f, name: fileToLabel(f) }));
     renderSpaceCards(dbSpaces);
     renderPmSpaces(dbSpaces);
-  } catch(e) {} // silencieux si database/ absent
+  } catch(e) {
+    console.error('[PLY Explorer] Erreur chargement index.json :', e);
+  }
 }
 
 function renderSpaceCards(spaces) {
@@ -806,12 +843,33 @@ async function loadSpaceByDef(def) {
     setProgress('CONSTRUCTION SCÈNE…', 85);
     currentFile = def.file;
     // JSON des salles de cet espace (même nom que le PLY)
-    fetch(`database/${def.file}.json`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => d && loadSallesData(d))
-      .catch(() => {});
+    // Lit aussi upPreset, floorY, pointSize si présents dans le JSON
+    let spacePreset = 1; // défaut mapanything
+    try {
+      console.log(`[JSON] Tentative : database/${def.file}.json`);
+      const jr = await fetch(`database/${def.file}.json`);
+      console.log(`[JSON] Réponse HTTP ${jr.status} pour ${def.file}.json`);
+      if (jr.ok) {
+        const jd = await jr.json();
+        // "floorY" et "floor" sont synonymes ; valeur = offset Three.js depuis minY
+        const rawFloor = typeof jd.floorY === 'number' ? jd.floorY
+                       : typeof jd.floor  === 'number' ? jd.floor
+                       : null;
+        console.log(`[JSON] ${def.file}.json lu → upPreset=${jd.upPreset} floor=${rawFloor} pointSize=${jd.pointSize}`);
+        if (typeof jd.upPreset === 'number') spacePreset = jd.upPreset;
+        floorYOverride  = rawFloor;   // null = détection auto
+        pointSizeOverride = (typeof jd.pointSize === 'number') ? jd.pointSize : null;
+        loadSallesData(jd);
+      } else {
+        console.warn(`[JSON] ${def.file}.json introuvable (HTTP ${jr.status})`);
+        floorYOverride = null; pointSizeOverride = null;
+      }
+    } catch(e) {
+      console.error(`[JSON] Erreur fetch ${def.file}.json :`, e);
+      floorYOverride = null; pointSizeOverride = null;
+    }
     await new Promise(r => setTimeout(r, 30));
-    worldUpPreset = 1;
+    worldUpPreset = spacePreset;
     updateUpButton();
     loadParsed(parsed);
     // Mettre à jour le sélecteur dans le menu pause
@@ -859,23 +917,28 @@ document.getElementById('salles-input-pm').addEventListener('change', e => {
 });
 
 function initScene() {
-  renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  // antialias désactivé pour les nuages de points (aucun bénéfice, coûteux)
+  renderer = new THREE.WebGLRenderer({ antialias: false });
+  // Pixel ratio plafonné à 1 : sur écran Retina pixelRatio=2 quadruple les pixels
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping   = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  // Tone mapping désactivé : les nuages de points ont des vertex colors directes
+  renderer.toneMapping = THREE.NoToneMapping;
+  // Shadows désactivées : inutiles sur un nuage de points
+  renderer.shadowMap.enabled = false;
   document.getElementById('canvas-container').appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x080c10);
-  scene.fog = new THREE.FogExp2(0x080c10, 0.025);
+  // Fog désactivé par défaut : calcul per-point très coûteux sur des millions de points
+  scene.fog = null;
 
   camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.03, 600);
 
   // Lights (used if mesh mode)
   const amb = new THREE.AmbientLight(0x405570, 0.7); scene.add(amb);
-  const sun = new THREE.DirectionalLight(0xffffff,1.3); sun.position.set(10,20,8); sun.castShadow=true; scene.add(sun);
+  const sun = new THREE.DirectionalLight(0xffffff,1.3); sun.position.set(10,20,8); scene.add(sun);
   const fill= new THREE.DirectionalLight(0x38f0b8,0.3); fill.position.set(-8,4,-10); scene.add(fill);
 
   window.addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); });
@@ -949,6 +1012,12 @@ function loadParsed(parsed) {
   const maxD = Math.max(sz.x, sz.y, sz.z);
   const scale = 30 / maxD;
   explorerScale = scale;        // ← mémoriser pour conversion coords salles
+  // Calibrer le joueur à l'échelle réelle du modèle :
+  // 1 unité Three.js = 1/scale mètre → humain 1,70 m = 1.7*scale unités.
+  // Sans ça, le joueur dépasse le plafond des couloirs pour les grands modèles.
+  player.height = Math.max(0.25, 1.7 * scale);
+  // SPEED et JUMP restent fixes : le modèle est normalisé à 30 unités donc
+  // la sensation de vitesse est indépendante de l'échelle réelle.
   geo.translate(-ctr.x, -ctr.y, -ctr.z); // center on all axes
   geo.scale(scale, scale, scale);
   if(worldUpPreset !== 0) {
@@ -976,15 +1045,22 @@ function loadParsed(parsed) {
   document.getElementById('row-ptsize').style.display = isPointCloud ? 'flex' : 'none';
 
   if (isPointCloud) {
+    // pointSizeOverride est en unités slider (0.5–8), même échelle que le curseur UI
+    const initPtSize = pointSizeOverride !== null ? pointSizeOverride * 0.01 : 0.06;
     ptsMaterial = new THREE.PointsMaterial({
-      size: 0.06,
+      size: initPtSize,
       vertexColors: !!colors,
       color: colors ? 0xffffff : 0x88bbdd,
       sizeAttenuation: true,
     });
+    // Synchroniser le slider avec la valeur JSON (slider = size / 0.01)
+    { const sl = document.getElementById('pt-size');
+      const sv = Math.min(8, Math.max(0.5, initPtSize / 0.01));
+      sl.value = sv;
+      document.getElementById('pt-size-val').textContent = sv.toFixed(1); }
     sceneObject = new THREE.Points(geo, ptsMaterial);
     setProgress('CONSTRUCTION HEIGHTMAP…', 80);
-    heightMap = new HeightMap(geo.attributes.position.array, 300);
+    heightMap = new HeightMap(geo.attributes.position.array, 300, floorYOverride);
   } else {
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: !!colors,
@@ -993,8 +1069,6 @@ function loadParsed(parsed) {
       side: THREE.DoubleSide,
     });
     sceneObject = new THREE.Mesh(geo, mat);
-    sceneObject.castShadow = true;
-    sceneObject.receiveShadow = true;
     meshForRaycast = sceneObject;
   }
   scene.add(sceneObject);
@@ -1004,11 +1078,11 @@ function loadParsed(parsed) {
   const nb = geo.boundingBox;
   const cx = (nb.min.x + nb.max.x) / 2;
   const cz2= (nb.min.z + nb.max.z) / 2;
-  // Spawn : on utilise floorY global (histogramme Y) = niveau sol détecté
-  // automatiquement, fiable même pour les couloirs étroits et les PLY mal orientés.
+  // Spawn : pieds à 0.1 unité au-dessus du sol détecté.
+  // player.pos.y = position des pieds ; caméra = pos.y + player.height.
   let spawnY = heightMap
-    ? heightMap.floorY + player.height + 0.5
-    : nb.min.y + player.height + 0.3;
+    ? heightMap.floorY + 0.1
+    : nb.min.y + 0.1;
   player.pos.set(cx, spawnY, cz2);
   player.vel.set(0,0,0);
   euler.set(0, Math.PI, 0); // face inward
@@ -1016,10 +1090,10 @@ function loadParsed(parsed) {
   // Mémoriser les bornes XZ pour la minimap
   sceneBounds = { xmin: nb.min.x, xmax: nb.max.x, zmin: nb.min.z, zmax: nb.max.z };
 
-  // Subsampler les positions XZ pour la minimap (max ~10 000 pts)
+  // Subsampler les positions XZ pour la minimap (max 4 000 pts)
   const posArr = geo.attributes.position.array;
   const totalPts = posArr.length / 3;
-  const step = Math.max(1, Math.floor(totalPts / 10000));
+  const step = Math.max(1, Math.floor(totalPts / 4000));
   minimapVerts = [];
   for (let i = 0; i < totalPts; i += step) {
     minimapVerts.push([posArr[i * 3], posArr[i * 3 + 2]]);
@@ -1135,11 +1209,14 @@ function updatePlayer(dt) {
     }
 
     if(groundY !== null) {
-      if(player.pos.y <= groundY + 0.05) {
+      // Ne snapper au sol que si la vélocité est vers le bas (ou nulle).
+      // Sans cette condition, le saut est annulé dans le même frame car le joueur
+      // monte de JUMP*dt < tolérance et se retrouve immédiatement re-snapé au sol.
+      if(player.pos.y <= groundY + 0.12 && player.vel.y <= 0) {
         player.pos.y = groundY;
-        if(player.vel.y < 0) player.vel.y = 0;
+        player.vel.y = 0;
         player.onGround = true;
-      } else {
+      } else if(player.pos.y > groundY + 0.12) {
         player.onGround = false;
       }
     } else {
@@ -1150,7 +1227,7 @@ function updatePlayer(dt) {
     if(heightMap && player.pos.y < heightMap.floorY - 5) {
       const rcx = (heightMap.minX+heightMap.maxX)/2;
       const rcz = (heightMap.minZ+heightMap.maxZ)/2;
-      player.pos.set(rcx, heightMap.floorY + player.height + 0.5, rcz);
+      player.pos.set(rcx, heightMap.floorY + 0.1, rcz);
       player.vel.set(0,0,0);
     }
   }
@@ -1364,16 +1441,43 @@ function drawMinimap() {
     ctx.restore();
   }
 
-  // Joueur (rond vert)
+  // Joueur — point directionnel avec cône de vue (style FPS)
+  // euler.y = rotation horizontale de la caméra (yaw)
+  // En espace canvas : X monde → X canvas, Z monde → Y canvas
+  // → angle canvas = euler.y - π/2
   const [px, pz] = mmWorldToScreen(player.pos.x, player.pos.z);
+  const viewAngle = Math.PI / 2 + euler.y;  // = atan2(cos(y), -sin(y)), Z↑ inversé sur minimap
+  const coneLen   = 22;              // longueur du cône en pixels
+  const halfFov   = Math.PI / 6;    // demi-angle = 30° → champ total 60°
+
   ctx.save();
-  ctx.shadowColor = '#38f0b8'; ctx.shadowBlur = 8;
+
+  // Cône de vue — secteur translucide avec halo
+  ctx.shadowColor = '#38f0b8'; ctx.shadowBlur = 10;
   ctx.beginPath();
-  ctx.arc(px, pz, 6, 0, Math.PI * 2);
+  ctx.moveTo(px, pz);
+  ctx.arc(px, pz, coneLen, viewAngle - halfFov, viewAngle + halfFov);
+  ctx.closePath();
+  ctx.fillStyle   = 'rgba(56,240,184,0.15)';
+  ctx.strokeStyle = 'rgba(56,240,184,0.45)';
+  ctx.lineWidth   = 1;
+  ctx.fill();
+  ctx.stroke();
+
+  // Halo joueur
+  ctx.shadowColor = '#38f0b8'; ctx.shadowBlur = 18;
+  ctx.beginPath();
+  ctx.arc(px, pz, 5, 0, Math.PI * 2);
   ctx.fillStyle = '#38f0b8';
   ctx.fill();
-  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-  ctx.stroke();
+
+  // Point blanc central (sur le dessus, sans ombre parasite)
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(px, pz, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
   ctx.restore();
 }
 
@@ -1494,7 +1598,7 @@ function openTransitionMenu() {
     const item = document.createElement('div');
     item.className = 'tm-dest-item';
     item.innerHTML =
-      `<span class="tm-dest-icon">🏢</span>`
+      `<span class="tm-dest-icon">[+]</span>`
       + `<span class="tm-dest-name">${dest.nom || fileToLabel(dest.file)}</span>`
       + `<span class="tm-dest-hint">→ ${dest.file}</span>`;
     item.addEventListener('click', () => {
@@ -1535,7 +1639,7 @@ function teleportToSalle(s) {
   // Ajuster Y via la heightmap si disponible, sinon garder la hauteur actuelle
   if (heightMap) {
     const hy = heightMap.sample(wp.x, wp.z);
-    if (hy !== null) player.pos.y = hy + player.height + 0.1;
+    if (hy !== null) player.pos.y = hy + 0.1;
   }
   player.vel.set(0, 0, 0);
   // Reprendre l'exploration (verrouiller le pointeur)
@@ -1923,6 +2027,8 @@ function handleFile(file) {
         const parsed = loader.parse(e.target.result);
         setProgress('CONSTRUCTION SCÈNE…', 85);
         worldUpPreset = 1;
+        floorYOverride = null;
+        pointSizeOverride = null;
         updateUpButton();
         setTimeout(()=> loadParsed(parsed), 30);
       } catch(err) {
@@ -1947,19 +2053,25 @@ document.getElementById('btn-back').addEventListener('click', backToMenu);
 //  LOOP
 // ═══════════════════════════════════════════════════════════════════════
 let last = performance.now();
+let _frameCount = 0;
 function animate() {
   requestAnimationFrame(animate);
   const now=performance.now(); const dt=Math.min((now-last)/1000,.05); last=now;
+  _frameCount++;
   updatePlayer(dt);
   renderer.render(scene, camera);
-  renderSalleLabels();
-  renderTransitionLabels();
-  drawMinimap();
-  updateProxNotif();
-  checkPathArrival();
-  if (sceneObject) {
-    document.getElementById('hud-coords').textContent =
-      `X ${player.pos.x.toFixed(3)}   Y ${player.pos.y.toFixed(3)}   Z ${player.pos.z.toFixed(3)}`;
+  // Minimap, labels et HUD : toutes les 3 frames (≈20 Hz à 60 fps)
+  // Évite des opérations canvas/DOM coûteuses à 60 Hz sur de grands modèles.
+  if (_frameCount % 3 === 0) {
+    renderSalleLabels();
+    renderTransitionLabels();
+    drawMinimap();
+    updateProxNotif();
+    checkPathArrival();
+    if (sceneObject) {
+      document.getElementById('hud-coords').textContent =
+        `X ${player.pos.x.toFixed(3)}   Y ${player.pos.y.toFixed(3)}   Z ${player.pos.z.toFixed(3)}`;
+    }
   }
 }
 

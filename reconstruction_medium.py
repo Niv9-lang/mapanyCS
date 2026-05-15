@@ -4,21 +4,38 @@ Reconstruction 3D - Point cloud PLY à partir d'images
 Utilise MapAnything pour générer une reconstruction 3D colorée (nuage de points PLY).
 """
 
+# ── Bibliothèques standard ──────────────────────────────────────────────────
 import os
 import sys
 import glob
 import json
 import argparse
-import torch
-import numpy as np
-import open3d as o3d
 
+# ── Dépendances externes ────────────────────────────────────────────────────
+#   pip install -r requirements.txt
+#   ou individuellement :
+import torch        # pip install torch  (voir https://pytorch.org pour CUDA/MPS/CPU)
+import numpy as np  # pip install numpy
+import open3d as o3d  # pip install open3d
+
+# ── Modèle MapAnything (installer le package local) ─────────────────────────
+#   pip install -e .   (depuis la racine du projet)
 from mapanything.models import MapAnything
 from mapanything.utils.image import load_images
 from mapanything.models import init_model_from_config
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+# Pour détecter  Apple Silicon
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# À remplacer par :
+if torch.cuda.is_available():
+    device = "cuda"
+elif torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
 print(f"Device: {device}")
 if torch.cuda.is_available():
     print(f"CUDA: {torch.version.cuda}")
@@ -26,6 +43,7 @@ if torch.cuda.is_available():
 # 2. Loading the MapAnything Model from HuggingFace Hub
 
 model = MapAnything.from_pretrained("facebook/map-anything").to(device)
+#model = init_model_from_config("pi3", device="cuda")
 
 # model = init_model_from_config("mast3r", device="cuda")
 #ou
@@ -45,27 +63,27 @@ args = parser.parse_args()
 
 set_of_images = args.image_folder
 if not os.path.isdir(set_of_images):
-    print(f"✗ Dossier introuvable: {set_of_images}")
-    print("  Placez vos images dans un dossier (ex: img_mapanything/) ou utilisez --image_folder")
+    print(f"Dossier introuvable: {set_of_images}")
+    print("Placez vos images dans un dossier (ex: img_mapanything/) ou utilisez --image_folder")
     sys.exit(1)
 
 views = load_images(set_of_images)
 print(f"✓ {len(views)} images chargées depuis {set_of_images}")
 if len(views) == 0:
-    print("✗ Aucune image trouvée!")
+    print("Aucune image trouvée!")
     sys.exit(1) 
 
 
 # 4. Running Inference with Optimized Parameters
 predictions = model.infer(
     views,                            # Input views
-    memory_efficient_inference=False, # Trades off speed for more views (up to 2000 views on 140 GB)
+    memory_efficient_inference=True, # Trades off speed for more views (up to 2000 views on 140 GB)
     use_amp=True,                     # Use mixed precision inference (recommended)
     amp_dtype="bf16",                 # bf16 inference (recommended; falls back to fp16 if bf16 not supported)
     apply_mask=True,                  # Apply masking to dense geometry outputs
     mask_edges=True,                  # Remove edge artifacts by using normals and depth
     apply_confidence_mask=False,      # Filter low-confidence regions
-    confidence_percentile=10,         # Remove bottom 10 percentile confidence pixels
+    confidence_percentile=5,         # Remove bottom 10 percentile confidence pixels
 )
 
 # 5. Extracting Valid 3D Points with Mask Filtering
@@ -130,11 +148,11 @@ def merge_all_views_to_pointcloud(predictions, apply_mask=True, verbose=True):
     merged_colors = np.vstack(all_colors)
     
     if verbose:
-        print(f"\n✅ Total merged points: {merged_points.shape[0]:,}")
+        print(f"\n Total merged points: {merged_points.shape[0]:,}")
     
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(merged_points)
-    pcd.colors = o3d.utility.Vector3dVector(merged_colors)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(merged_points)
+        pcd.colors = o3d.utility.Vector3dVector(merged_colors)
     
     return pcd
 
@@ -146,7 +164,7 @@ if not args.no_visualize:
     o3d.visualization.draw_geometries([pcd_complete], window_name="Complete 3D Reconstruction")
 
 o3d.io.write_point_cloud(args.output, pcd_complete)
-print(f"\n✓ Reconstruction sauvegardée: {args.output}")
+print(f"\n Reconstruction sauvegardée: {args.output}")
 
 # ── Sauvegarde des poses pour la localisation visuelle ──────────────
 # Récupère les fichiers images dans le même ordre que load_images (tri alpha)
