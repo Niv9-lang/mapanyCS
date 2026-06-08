@@ -1,0 +1,8 @@
+{
+  "salle1": ["EA", "EC", "EE", "ED"],
+  "salle3": ["IV", "VI.005", "SALLE J. SAULIERE"],
+  "section4": ["LC.401 à LC.409", "LC.410 à LC.429", "LC.431 à LC.467", "LC.407", "LC.405", "LC.403"],
+  "section5": ["LC.412", "LC.410", "LC.411", "LC.413", "LC.414", "LC.416", "LC.415"],
+  "section6": ["LC.417", "LC.419", "LC.418", "LC.421", "LC.420"],
+  "section7": ["LC.422", "LC.424", "LC.426"]
+}
