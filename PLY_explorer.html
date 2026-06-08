@@ -19,7 +19,7 @@
   /* DROP */
   #drop-screen { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg); z-index:100; gap:1.8rem; transition:opacity .4s; }
   #drop-screen.hidden { opacity:0; pointer-events:none; }
-  .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(2.2rem,5vw,4rem); background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(2.2rem,5vw,4rem); background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
   .subtitle { color:var(--dim); font-size:.7rem; letter-spacing:.15em; text-transform:uppercase; }
   .badge { font-size:.62rem; color:var(--accent2); background:rgba(106,127,255,.12); border:1px solid rgba(106,127,255,.25); border-radius:20px; padding:.25rem .8rem; letter-spacing:.06em; }
   .drop-zone { width:min(460px,90vw); border:1.5px dashed var(--border); border-radius:14px; padding:2.5rem 2rem; display:flex; flex-direction:column; align-items:center; gap:1rem; cursor:pointer; transition:border-color .2s,background .2s; background:rgba(56,240,184,.02); }
@@ -50,7 +50,7 @@
   /* TOP BAR */
   #top-bar { position:fixed; top:0; left:0; right:0; padding:.8rem 1.4rem; display:flex; align-items:center; justify-content:space-between; background:linear-gradient(to bottom,rgba(8,12,18,.95),transparent); z-index:50; opacity:0; pointer-events:none; transition:opacity .5s; }
   #top-bar.visible { opacity:1; pointer-events:all; }
-  .top-title { font-family:'Syne',sans-serif; font-weight:800; font-size:.95rem; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .top-title { font-family:'Syne',sans-serif; font-weight:800; font-size:.95rem; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
   #stats { font-size:.6rem; color:var(--dim); letter-spacing:.08em; }
   .btn-back { background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--dim); font-family:'Space Mono',monospace; font-size:.62rem; padding:.3rem .8rem; cursor:pointer; transition:color .2s,border-color .2s; }
   .btn-back:hover { color:var(--danger); border-color:var(--danger); }
@@ -126,12 +126,31 @@
   #salles-status { font-size:.62rem; color:var(--accent2); letter-spacing:.05em; margin-top:.5rem; min-height:1em; text-align:center; }
 
   /* MINIMAP */
-  #mm-wrap { position:fixed; top:1.1rem; right:1.3rem; z-index:48; display:none; flex-direction:column; gap:0; }
+  #mm-backdrop { position:fixed; inset:0; background:rgba(5,7,17,.78); z-index:72; display:none; backdrop-filter:blur(3px); cursor:pointer; }
+  #mm-backdrop.visible { display:block; }
+  #mm-wrap { position:fixed; top:1.1rem; right:1.3rem; z-index:48; display:none; flex-direction:column; gap:0; transition:top .18s,left .18s,right .18s,transform .18s; }
   #mm-wrap.visible { display:flex; }
+  #mm-wrap.expanded { top:50% !important; left:50% !important; right:auto !important; transform:translate(-50%,-50%); z-index:75; }
   #mm-header { background:rgba(0,0,0,.95); border:2px solid #0066ff; border-bottom:none; border-radius:8px 8px 0 0; padding:4px 8px; display:flex; align-items:center; justify-content:space-between; }
   #mm-title { font-size:.55rem; color:#7fa9ff; letter-spacing:.12em; text-transform:uppercase; }
   #mm-hint  { font-size:.5rem; color:rgba(127,169,255,.45); }
+  #mm-hint-m { color:rgba(127,255,200,.6); }
+  /* Tailles agrandies uniquement en mode étendu (touche M) */
+  #mm-wrap.expanded #mm-header { padding:6px 12px; }
+  #mm-wrap.expanded #mm-title  { font-size:.85rem; }
+  #mm-wrap.expanded #mm-hint   { font-size:.72rem; color:rgba(127,169,255,.6); }
   #mm-canvas-wrap { overflow:hidden; border-radius:0 0 8px 8px; border:2px solid #0066ff; border-top:none; box-shadow:0 0 20px rgba(0,102,255,.35); }
+  #mm-wrap.expanded #mm-canvas-wrap { box-shadow:0 0 40px rgba(0,102,255,.55); }
+  #mm-tol-wrap { display:none; align-items:center; gap:6px; margin-left:10px; }
+  #mm-wrap.expanded #mm-tol-wrap { display:flex; }
+  #mm-tol { width:110px; height:6px; -webkit-appearance:none; appearance:none; background:rgba(0,102,255,.4); border-radius:3px; outline:none; cursor:pointer; }
+  #mm-tol::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background:#4af; cursor:pointer; border:2px solid rgba(255,255,255,.3); box-shadow:0 0 6px rgba(0,170,255,.6); }
+  #mm-tol::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:#4af; cursor:pointer; border:2px solid rgba(255,255,255,.3); }
+  #mm-tol-lbl { font-size:.68rem; color:rgba(127,180,255,.75); white-space:nowrap; }
+  #mm-path-bar { display:none; background:rgba(0,0,0,.92); border:2px solid #0066ff; border-top:none; border-radius:0 0 8px 8px; padding:6px 12px; font-family:'Space Mono',monospace; font-size:.78rem; color:#7fa9ff; text-align:center; min-height:24px; }
+  #mm-wrap.expanded #mm-path-bar { display:block; }
+  #mm-path-bar.ok  { color:#a3e635; }
+  #mm-path-bar.err { color:#ff3d6e; }
   #minimap { display:block; background:#080b16; cursor:crosshair; }
 
   /* PROXIMITÉ */
@@ -253,14 +272,20 @@
 
 <div id="canvas-container"></div>
 <div id="salles-overlay"></div>
+<div id="mm-backdrop"></div>
 <div id="mm-wrap">
   <div id="mm-header">
     <span id="mm-title">Minimap — Vue XZ</span>
-    <span id="mm-hint">scroll:zoom · clic salle:naviguer</span>
+    <span id="mm-hint">scroll:zoom · <span id="mm-hint-m">M:agrandir</span></span>
+    <span id="mm-tol-wrap">
+      <span id="mm-tol-lbl">Sol± <span id="mm-tol-val">20cm</span></span>
+      <input type="range" id="mm-tol" min="5" max="200" step="5" value="20">
+    </span>
   </div>
   <div id="mm-canvas-wrap">
     <canvas id="minimap" width="220" height="220"></canvas>
   </div>
+  <div id="mm-path-bar">Cliquer A puis B pour calculer un chemin</div>
 </div>
 <div id="prox-notif"></div>
 <div id="transition-notif"></div>
@@ -330,6 +355,7 @@
   <div class="hud-row"><span class="key">Z</span><span class="key">Q</span><span class="key">S</span><span class="key">D</span> Déplacer</div>
   <div class="hud-row"><span class="key">SPC</span> Sauter &nbsp; <span class="key">⇧</span> Sprint</div>
   <div class="hud-row"><span class="key">N</span> Noclip (traverser murs)</div>
+  <div class="hud-row"><span class="key">M</span> Agrandir / réduire minimap</div>
   <div class="hud-row" id="hud-path-hint" style="display:none"><span class="key" style="color:var(--accent2);border-color:var(--accent2)">C</span> <span style="color:var(--accent2)">Annuler le chemin</span></div>
   <div class="hud-row" id="hud-transition-hint" style="display:none"><span class="key" style="color:#f0c040;border-color:#f0c040">L</span> <span style="color:#f0c040">Accès niveau ↕</span></div>
   <div class="hud-row" id="hud-noclip-hint" style="display:none;color:var(--accent)"><span class="key" style="color:var(--accent);border-color:var(--accent)">SPC</span>↑ &nbsp;<span class="key" style="color:var(--accent);border-color:var(--accent)">⇧</span>↓ &nbsp;voler librement</div>
@@ -350,7 +376,7 @@ import * as THREE from 'three';
 // ═══════════════════════════════════════════════════════════════════════
 class PLYLoader {
   parse(data) {
-    const head = new TextDecoder().decode(new Uint8Array(data, 0, Math.min(2048, data.byteLength)));
+    const head = new TextDecoder().decode(new Uint8Array(data, 0, Math.min(65536, data.byteLength)));
     if (!head.startsWith('ply')) throw new Error('Not a PLY file');
     const ascii = head.includes('format ascii');
     return ascii ? this._ascii(new TextDecoder().decode(data)) : this._binary(data, head);
@@ -410,6 +436,9 @@ class PLYLoader {
         const xi=pn.indexOf('x'),yi=pn.indexOf('y'),zi=pn.indexOf('z');
         const nxi=pn.indexOf('nx'),nyi=pn.indexOf('ny'),nzi=pn.indexOf('nz');
         const ri=pn.indexOf('red'),gi=pn.indexOf('green'),bi=pn.indexOf('blue');
+        // Fichier tronqué : limiter le count aux vertices réellement disponibles
+        const allFixed = el.props.every(p=>!p.list);
+        if(allFixed){ const stride=el.props.reduce((s,p)=>s+this._sz(p.type),0); if(stride>0){ const maxV=Math.floor((dv.byteLength-off)/stride); if(el.count>maxV){console.warn(`PLY tronqué : ${maxV}/${el.count} vertices`);el.count=maxV;} } }
         result.verts  = new Float32Array(el.count*3);
         if(nxi>=0) result.normals= new Float32Array(el.count*3);
         if(ri>=0)  result.colors = new Float32Array(el.count*3);
@@ -527,25 +556,28 @@ class HeightMap {
       for(let d=-2;d<=2;d++){const nb=b+d;if(nb>=0&&nb<N_HIST){s+=yhist[nb];n++;}}
       yhs[b]=s/n;
     }
-    // Sol = pic dominant dans les 25 % inférieurs
-    const floorTopBin=Math.floor(N_HIST*0.25);
-    let floorBin=0;
-    for(let b=1;b<floorTopBin;b++) if(yhs[b]>yhs[floorBin]) floorBin=b;
+    // Détection sol + plafond : les deux pics de densité les plus élevés.
+    // Le plus bas en Y = sol, le plus haut = plafond.
+    // Plus robuste qu'une restriction aux X% inférieurs/supérieurs car le sol
+    // est toujours la surface horizontale la plus représentée dans la moitié basse,
+    // et le plafond dans la moitié haute — sans seuil arbitraire.
+    const peaks=[];
+    for(let b=1;b<N_HIST-1;b++) if(yhs[b]>yhs[b-1]&&yhs[b]>yhs[b+1]) peaks.push(b);
+    peaks.sort((a,b)=>yhs[b]-yhs[a]);
+    const top2=peaks.slice(0,2).sort((a,b)=>a-b);
+    const floorBin = top2.length>=2 ? top2[0] : (top2.length===1 ? top2[0] : 0);
+    const ceilBin  = top2.length>=2 ? top2[1] : N_HIST-1;
     const p03=yArr[Math.max(0,Math.floor(nPts*0.03))];
     const peakDensity=nPts>0?yhs[floorBin]/nPts:0;
-    // Plafond = pic dominant dans les 25 % supérieurs
-    const ceilBotBin=Math.floor(N_HIST*0.75);
-    let ceilBin=N_HIST-1;
-    for(let b=N_HIST-2;b>=ceilBotBin;b--) if(yhs[b]>yhs[ceilBin]) ceilBin=b;
     this.ceilApprox = minY+(ceilBin+0.5)/N_HIST*yRange;
-    // Sol : override JSON prioritaire, sinon pic d'histogramme, sinon p03
-    // floorOverride = offset Three.js depuis minY (0 = sol au fond, -1 = 1 unité plus bas)
-    if(floorOverride !== null) {
-      this.floorY = minY + floorOverride;
-    } else {
-      this.floorY = peakDensity>0.003 ? minY+(floorBin+0.5)/N_HIST*yRange : p03;
-    }
-    const BAND = (this.ceilApprox-this.floorY)*0.08;
+    // Sol auto-détecté : utilisé pour construire la grille de hauteur (bande de recherche)
+    const floorYAuto = peakDensity>0.003 ? minY+(floorBin+0.5)/N_HIST*yRange : p03;
+    // Sol final : override JSON (coordonnée Y absolue Three.js) ou auto-détecté
+    this.floorY = (floorOverride !== null) ? floorOverride : floorYAuto;
+    // La bande de détection utilise TOUJOURS l'auto-détecté :
+    // si floorOverride ne coïncide pas avec les vrais points sol, la grille reste correcte.
+    const bandCenter = floorYAuto;
+    const BAND = (this.ceilApprox - bandCenter) * 0.08;
 
     // ── Construction des grilles par cellule XZ ──────────────────────────
     const cells = res * res;
@@ -561,7 +593,7 @@ class HeightMap {
       const cz=Math.min(res-1,Math.max(0,Math.floor((z-minZ)/this.spanZ*(res-1))));
       const idx=cz*res+cx;
       if(y<minGrid[idx]) minGrid[idx]=y;
-      const d=Math.abs(y-this.floorY);
+      const d=Math.abs(y-bandCenter);
       if(d<BAND && d<floorDist[idx]){ floorDist[idx]=d; floorRaw[idx]=y; }
     }
     // Pour les cellules sans point dans la bande, utiliser le minimum brut
@@ -665,6 +697,127 @@ let sceneBounds   = null;   // {xmin,xmax,zmin,zmax} de la scène chargée
 let minimapCtx    = null;
 let minimapVerts  = [];   // [[x, z], …] subsamplé en coordonnées monde
 const mm = { zoom: 1.0, pan: { x: 0, y: 0 }, drag: { active: false } };
+let mmExpanded  = false;
+let mmFloorTol  = 0.20;
+let mmOccCanvas = null;
+let mmPointA    = null;
+let mmPointB    = null;
+let mmManualPath= null;
+
+function mmRenderGrid() {
+  if (!occGrid) return;
+  const gs = occGrid.gs;
+  const off = document.createElement('canvas');
+  off.width = gs; off.height = gs;
+  const gctx = off.getContext('2d');
+  const img  = gctx.createImageData(gs, gs);
+  const d    = img.data;
+  for (let i = 0; i < gs * gs; i++) {
+    const v = occGrid.grid[i], b = i * 4;
+    if      (v === 0) { d[b]=10;  d[b+1]=26; d[b+2]=48; d[b+3]=255; }
+    else if (v === 1) { d[b]=160; d[b+1]=45; d[b+2]=20; d[b+3]=255; }
+    else              { d[b]=7;   d[b+1]=10; d[b+2]=16; d[b+3]=255; }
+  }
+  gctx.putImageData(img, 0, 0);
+  mmOccCanvas = off;
+}
+
+function mmScreenToWorld(px, py) {
+  const cvs = minimapCtx.canvas;
+  const W = cvs.width, H = cvs.height, cx = W/2, cy = H/2;
+  const { xmin, xmax, zmin, zmax } = sceneBounds;
+  const sx = ((px - cx - mm.pan.x) / mm.zoom + cx) / W;
+  const sy = ((py - cy - mm.pan.y) / mm.zoom + cy) / H;
+  return { x: xmin + sx*(xmax-xmin), z: zmin + (1-sy)*(zmax-zmin) };
+}
+
+function mmClearPoints() {
+  mmPointA = null; mmPointB = null; mmManualPath = null;
+  const bar = document.getElementById('mm-path-bar');
+  bar.className = ''; bar.textContent = 'Cliquer A puis B pour calculer un chemin';
+}
+
+function mmComputePath() {
+  if (!mmPointA || !mmPointB) return;
+  if (!occGrid) { occGrid = buildOccGrid(512); mmRenderGrid(); }
+  const result = astarPath(mmPointA.x, mmPointA.z, mmPointB.x, mmPointB.z);
+  const bar = document.getElementById('mm-path-bar');
+  if (!result || result.length < 2) {
+    mmManualPath = null;
+    bar.className = 'err'; bar.textContent = '✗ Aucun chemin trouvé';
+    return;
+  }
+  mmManualPath = result;
+  let len = 0;
+  for (let i = 1; i < result.length; i++) {
+    const dx = result[i][0]-result[i-1][0], dz = result[i][1]-result[i-1][1];
+    len += Math.sqrt(dx*dx+dz*dz);
+  }
+  // Conversion unités Three.js → mètres : 1 u = 1/explorerScale m
+  const lenM = explorerScale > 0 ? len / explorerScale : len;
+  const distStr = lenM >= 1
+    ? `${lenM.toFixed(2)} m`
+    : `${(lenM * 100).toFixed(0)} cm`;
+  bar.className = 'ok';
+  bar.textContent = `✓  ${distStr} · ${result.length} points`;
+}
+
+// ── Sol Y interactif ─────────────────────────────────────────────────────────
+function _floorKey() {
+  return currentFile ? `floorY_${currentFile}` : null;
+}
+
+function _syncFloorInput(y) {
+  const inp = document.getElementById('floor-y-input');
+  if (inp) inp.value = (y !== null && y !== undefined) ? parseFloat(y).toFixed(2) : '';
+}
+
+
+function _loadFloorY(fileKey, jsonFloor) {
+  // Priorité : 1. localStorage (réglage manuel)  2. JSON  3. auto-détection
+  const saved = fileKey ? localStorage.getItem(`floorY_${fileKey}`) : null;
+  if (saved !== null) {
+    floorYOverride = parseFloat(saved);
+    _syncFloorInput(floorYOverride);
+  } else if (jsonFloor !== null && jsonFloor !== undefined) {
+    floorYOverride = jsonFloor;
+    _syncFloorInput(floorYOverride);
+  } else {
+    floorYOverride = null;
+    _syncFloorInput(null);
+  }
+}
+
+function toggleMinimapExpand() {
+  mmExpanded = !mmExpanded;
+  const cvs      = document.getElementById('minimap');
+  const wrap     = document.getElementById('mm-wrap');
+  const backdrop = document.getElementById('mm-backdrop');
+  const hint     = document.getElementById('mm-hint-m');
+
+  if (mmExpanded) {
+    const size = Math.min(window.innerWidth * 0.88, window.innerHeight * 0.88) | 0;
+    cvs.width  = size;
+    cvs.height = size;
+    wrap.classList.add('expanded');
+    backdrop.classList.add('visible');
+    hint.textContent = 'M:réduire';
+    mm.zoom = 1; mm.pan.x = 0; mm.pan.y = 0;
+    // Libérer le pointer lock pour permettre les clics sur la minimap
+    document.exitPointerLock();
+    // Construire + rendre la grille si pas encore fait
+    if (!occGrid) occGrid = buildOccGrid(512);
+    if (!mmOccCanvas) mmRenderGrid();
+  } else {
+    cvs.width  = 220;
+    cvs.height = 220;
+    wrap.classList.remove('expanded');
+    backdrop.classList.remove('visible');
+    hint.textContent = 'M:agrandir';
+    mm.zoom = 1; mm.pan.x = 0; mm.pan.y = 0;
+    mmClearPoints();
+  }
+}
 
 /**
  * Les coordonnées dans salles.json sont en espace Three.js world
@@ -847,26 +1000,28 @@ async function loadSpaceByDef(def) {
     let spacePreset = 1; // défaut mapanything
     try {
       console.log(`[JSON] Tentative : database/${def.file}.json`);
-      const jr = await fetch(`database/${def.file}.json`);
+      const jr = await fetch(`database/${def.file}.json?v=${Date.now()}`);
       console.log(`[JSON] Réponse HTTP ${jr.status} pour ${def.file}.json`);
       if (jr.ok) {
         const jd = await jr.json();
-        // "floorY" et "floor" sont synonymes ; valeur = offset Three.js depuis minY
+        // "floorY" et "floor" sont synonymes ; valeur = coordonnée Y absolue Three.js
         const rawFloor = typeof jd.floorY === 'number' ? jd.floorY
                        : typeof jd.floor  === 'number' ? jd.floor
                        : null;
         console.log(`[JSON] ${def.file}.json lu → upPreset=${jd.upPreset} floor=${rawFloor} pointSize=${jd.pointSize}`);
         if (typeof jd.upPreset === 'number') spacePreset = jd.upPreset;
-        floorYOverride  = rawFloor;   // null = détection auto
         pointSizeOverride = (typeof jd.pointSize === 'number') ? jd.pointSize : null;
         loadSallesData(jd);
+        _loadFloorY(def.file, rawFloor);
       } else {
         console.warn(`[JSON] ${def.file}.json introuvable (HTTP ${jr.status})`);
-        floorYOverride = null; pointSizeOverride = null;
+        pointSizeOverride = null;
+        _loadFloorY(def.file, null);
       }
     } catch(e) {
       console.error(`[JSON] Erreur fetch ${def.file}.json :`, e);
-      floorYOverride = null; pointSizeOverride = null;
+      pointSizeOverride = null;
+      _loadFloorY(def.file, null);
     }
     await new Promise(r => setTimeout(r, 30));
     worldUpPreset = spacePreset;
@@ -943,18 +1098,27 @@ function initScene() {
 
   window.addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); });
   window.addEventListener('keydown', e=>{
+    // Raccourci système (Cmd/Meta) : macOS avale les keyup → vider toutes les touches
+    // pour éviter qu'une touche comme Shift reste bloquée (ex. Cmd+Shift+5 = capture vidéo)
+    if(e.metaKey){ for(const k in keys) keys[k]=false; return; }
     keys[e.code]=true;
     if(e.code==='Space') e.preventDefault();
     if(e.code==='KeyN') toggleNoclip();
     if(e.code==='KeyG') cycleUpAxis();
     if(e.code==='KeyC') clearPath();
+    if(e.key==='m'||e.key==='M') toggleMinimapExpand();
     if(e.code==='KeyL') {
       if (transitionMenuOpen) closeTransitionMenu();
       else openTransitionMenu();
     }
-    if(e.code==='Escape' && transitionMenuOpen) closeTransitionMenu();
+    if(e.code==='Escape') {
+      if (transitionMenuOpen) closeTransitionMenu();
+      if (mmExpanded) toggleMinimapExpand();
+    }
   });
   window.addEventListener('keyup',   e=>{ keys[e.code]=false; });
+  window.addEventListener('blur',    ()=>{ for(const k in keys) keys[k]=false; });
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) for(const k in keys) keys[k]=false; });
 
   const pm = document.getElementById('pause-menu');
   const resume = document.getElementById('pm-resume');
@@ -963,7 +1127,8 @@ function initScene() {
   renderer.domElement.addEventListener('click', requestLock);
   document.addEventListener('pointerlockchange', ()=>{
     const locked = document.pointerLockElement===renderer.domElement;
-    pm.classList.toggle('visible', !locked && !!sceneObject);
+    // Ne pas afficher le menu pause si la minimap est agrandie
+    pm.classList.toggle('visible', !locked && !!sceneObject && !mmExpanded);
     document.getElementById('crosshair').classList.toggle('visible', locked);
   });
   document.addEventListener('mousemove', e=>{
@@ -993,7 +1158,7 @@ function loadParsed(parsed) {
   if(sceneObject){ scene.remove(sceneObject); sceneObject=null; }
   heightMap=null; meshForRaycast=null; ptsMaterial=null;
   rawParsed = parsed;
-  occGrid = null;
+  occGrid = null; mmOccCanvas = null;
   clearPath();
 
   const { verts, normals, colors, indices, isPointCloud } = parsed;
@@ -1080,9 +1245,9 @@ function loadParsed(parsed) {
   const cz2= (nb.min.z + nb.max.z) / 2;
   // Spawn : pieds à 0.1 unité au-dessus du sol détecté.
   // player.pos.y = position des pieds ; caméra = pos.y + player.height.
-  let spawnY = heightMap
-    ? heightMap.floorY + 0.1
-    : nb.min.y + 0.1;
+  const _autoFloor = heightMap ? heightMap.floorY : nb.min.y;
+  let spawnY = (floorYOverride !== null) ? floorYOverride : _autoFloor + 0.1;
+  _syncFloorInput(floorYOverride !== null ? floorYOverride : _autoFloor);
   player.pos.set(cx, spawnY, cz2);
   player.vel.set(0,0,0);
   euler.set(0, Math.PI, 0); // face inward
@@ -1111,6 +1276,35 @@ function loadParsed(parsed) {
 
   hideProgress();
   showExplorer();
+  // Envoyer la grille d'occupation vers le serveur Flask (port 5000) en arrière-plan
+  setTimeout(_uploadGridToFlask, 500);
+}
+
+function _uint8ToBase64(arr) {
+  let bin = '', chunk = 8192;
+  for (let i = 0; i < arr.length; i += chunk)
+    bin += String.fromCharCode(...arr.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+async function _uploadGridToFlask() {
+  if (!sceneObject) return;
+  try {
+    const occ = buildOccGrid(512);
+    occGrid = occ;
+    const floorYC = heightMap ? heightMap.floorY : 0;
+    await fetch('http://127.0.0.1:5000/api/grid-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grid:          _uint8ToBase64(occ.grid),
+        grid_size:     occ.gs,
+        xmin: occ.xmin, xmax: occ.xmax,
+        zmin: occ.zmin, zmax: occ.zmax,
+        floor_y_center: floorYC,
+      }),
+    });
+  } catch(_) { /* Flask non démarré — silencieux */ }
 }
 
 
@@ -1200,8 +1394,10 @@ function updatePlayer(dt) {
     // par cellule est trop peu fiable pour guider la physique.
     // Le sample cellule garde son rôle pour la COLLISION MURS seulement.
     let groundY = null;
-    if(heightMap) {
-      groundY = heightMap.floorY;              // sol plat global, fiable
+    if(floorYOverride !== null) {
+      groundY = floorYOverride;                // sol défini dans le JSON
+    } else if(heightMap) {
+      groundY = heightMap.floorY;              // sol auto-détecté
     } else if(meshForRaycast) {
       rdDown.set(new THREE.Vector3(player.pos.x, player.pos.y+1.5, player.pos.z), new THREE.Vector3(0,-1,0));
       const hits = rdDown.intersectObject(meshForRaycast);
@@ -1224,10 +1420,11 @@ function updatePlayer(dt) {
     }
 
     // Fall reset : trop bas → replacer au centre de la scène, au niveau du sol global
-    if(heightMap && player.pos.y < heightMap.floorY - 5) {
-      const rcx = (heightMap.minX+heightMap.maxX)/2;
-      const rcz = (heightMap.minZ+heightMap.maxZ)/2;
-      player.pos.set(rcx, heightMap.floorY + 0.1, rcz);
+    const _floorRef = (floorYOverride !== null) ? floorYOverride : (heightMap ? heightMap.floorY : null);
+    if(_floorRef !== null && player.pos.y < _floorRef - 5) {
+      const rcx = heightMap ? (heightMap.minX+heightMap.maxX)/2 : 0;
+      const rcz = heightMap ? (heightMap.minZ+heightMap.maxZ)/2 : 0;
+      player.pos.set(rcx, _floorRef + 0.1, rcz);
       player.vel.set(0,0,0);
     }
   }
@@ -1325,12 +1522,46 @@ function initMinimap() {
   window.addEventListener('mouseup', () => { mm.drag.active = false; });
   cvs.addEventListener('contextmenu', e => e.preventDefault());
 
-  // Clic gauche → téléporter sur la salle la plus proche du clic
+  // Clic sur le backdrop → réduire la minimap
+  document.getElementById('mm-backdrop').addEventListener('click', () => {
+    if (mmExpanded) toggleMinimapExpand();
+  });
+
+  // Slider tolérance sol → reconstruire la grille
+  document.getElementById('mm-tol').addEventListener('input', e => {
+    const cm = parseInt(e.target.value);
+    mmFloorTol = cm / 100;
+    document.getElementById('mm-tol-val').textContent = cm >= 100 ? (cm/100).toFixed(2)+' m' : cm+' cm';
+    occGrid = null; mmOccCanvas = null;  // invalider le cache
+    mmClearPoints();
+    occGrid = buildOccGrid(512);
+    mmRenderGrid();
+    _uploadGridToFlask();  // re-synchroniser avec Flask
+  });
+
+  // Clic gauche → mode agrandi : placer A/B ; mode normal : naviguer vers salle
   cvs.addEventListener('click', e => {
     if (!sceneObject || !sceneBounds) return;
     const rect = cvs.getBoundingClientRect();
-    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-    let best = null, bestD2 = 22 * 22; // seuil 22px
+    const px = (e.clientX - rect.left) * (cvs.width  / rect.width);
+    const py = (e.clientY - rect.top)  * (cvs.height / rect.height);
+    if (mmExpanded) {
+      const wp = mmScreenToWorld(px, py);
+      if (!mmPointA) {
+        mmPointA = wp;
+        document.getElementById('mm-path-bar').textContent = 'A placé — cliquer pour B';
+      } else if (!mmPointB) {
+        mmPointB = wp;
+        mmComputePath();
+      } else {
+        // Troisième clic : réinitialiser
+        mmClearPoints();
+      }
+      return;
+    }
+    // Mode normal : téléporter vers la salle la plus proche
+    const sx = px, sy = py;
+    let best = null, bestD2 = 22 * 22;
     for (const m of salleMarkers) {
       const [msX, msY] = mmWorldToScreen(m.pos.x, m.pos.z);
       const d2 = (msX - sx) ** 2 + (msY - sy) ** 2;
@@ -1363,13 +1594,22 @@ function drawMinimap() {
   ctx.fillStyle = '#050711';
   ctx.fillRect(0, 0, W, H);
 
-  // Grille
-  ctx.strokeStyle = '#181b2a';
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 10; i++) {
-    const t = i / 10;
-    ctx.beginPath(); ctx.moveTo(t * W, 0); ctx.lineTo(t * W, H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, t * H); ctx.lineTo(W, t * H); ctx.stroke();
+  // En mode agrandi : afficher la grille d'occupation en fond
+  if (mmExpanded && mmOccCanvas) {
+    ctx.save();
+    ctx.translate(W/2 + mm.pan.x, H/2 + mm.pan.y);
+    ctx.scale(mm.zoom, -mm.zoom);   // -y = flip vertical (z zmin=bas minimap)
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(mmOccCanvas, -W/2, -H/2, W, H);
+    ctx.restore();
+  } else {
+    // Grille de fond classique
+    ctx.strokeStyle = '#181b2a'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      ctx.beginPath(); ctx.moveTo(t*W,0); ctx.lineTo(t*W,H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,t*H); ctx.lineTo(W,t*H); ctx.stroke();
+    }
   }
 
   // Points nuage de points (XZ)
@@ -1382,14 +1622,15 @@ function drawMinimap() {
 
   // Salles — bandeaux bleu/orange
   const mmProxOrange = (sallesData && sallesData.proximite_seuil ? sallesData.proximite_seuil : 12) * 0.4;
-  ctx.font = 'bold 8px "Space Mono", monospace';
+  const mmFontSz = mmExpanded ? 13 : 8;
+  ctx.font = `bold ${mmFontSz}px "Space Mono", monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const m of salleMarkers) {
     const [sx, sy] = mmWorldToScreen(m.pos.x, m.pos.z);
     const label = m.data.id || m.data.nom;
     const tw = ctx.measureText(label).width;
-    const bw = tw + 10, bh = 13;
+    const bw = tw + (mmExpanded ? 12 : 10), bh = mmExpanded ? 16 : 13;
     const dx = m.pos.x - player.pos.x, dz = m.pos.z - player.pos.z;
     const proche = Math.sqrt(dx*dx + dz*dz) < mmProxOrange;
     ctx.fillStyle   = proche ? 'rgba(200,80,0,.88)'  : 'rgba(0,60,180,.82)';
@@ -1479,6 +1720,36 @@ function drawMinimap() {
   ctx.fill();
 
   ctx.restore();
+
+  // ── Chemin manuel A→B (minimap agrandie) ──────────────────────────────────
+  if (mmExpanded && mmManualPath && mmManualPath.length >= 2) {
+    ctx.save();
+    ctx.strokeStyle = '#ffc107'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+    ctx.shadowColor = '#ffc107'; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    const [p0x, p0y] = mmWorldToScreen(mmManualPath[0][0], mmManualPath[0][1]);
+    ctx.moveTo(p0x, p0y);
+    for (let i = 1; i < mmManualPath.length; i++) {
+      const [ppx, ppy] = mmWorldToScreen(mmManualPath[i][0], mmManualPath[i][1]);
+      ctx.lineTo(ppx, ppy);
+    }
+    ctx.stroke(); ctx.restore();
+  }
+  // ── Marqueurs A et B ──────────────────────────────────────────────────────
+  if (mmExpanded) {
+    const _mmMarker = (wp, color, label) => {
+      if (!wp) return;
+      const [sx, sy] = mmWorldToScreen(wp.x, wp.z);
+      ctx.save();
+      ctx.fillStyle = color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(sx, sy, 7, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#07090f'; ctx.font = `bold ${mmFontSz}px "Space Mono",monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, sx, sy); ctx.restore();
+    };
+    _mmMarker(mmPointA, '#a3e635', 'A');
+    _mmMarker(mmPointB, '#ff3d6e', 'B');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1681,7 +1952,7 @@ class MinHeap {
   }
 }
 
-function buildOccGrid(gs = 64) {
+function buildOccGrid(gs = 256) {
   if (!sceneObject || !heightMap || !sceneBounds) return null;
   const verts = sceneObject.geometry.attributes.position.array;
   if (!verts || verts.length < 9) return null;
@@ -1693,8 +1964,6 @@ function buildOccGrid(gs = 64) {
   const yRange = (ymax - ymin) || 0.01;
 
   // ── 1. Détection du sol par histogramme Y ──────────────────────────
-  // En PLY_explorer (gravité vers Y-), le sol concentre la densité de
-  // points dans les 20 % inférieurs de l'étendue Y.
   const N_HIST = 100;
   const hist = new Float64Array(N_HIST);
   for (let i = 1; i < verts.length; i += 3) {
@@ -1708,32 +1977,44 @@ function buildOccGrid(gs = 64) {
     for (let d=-2; d<=2; d++) { const nb=b+d; if(nb>=0&&nb<N_HIST){s+=hist[nb];n++;} }
     hs[b] = s / n;
   }
-  // Pic dominant dans les 20 % inférieurs = plancher
-  const topBin = Math.floor(N_HIST * 0.20);
-  let floorBin = 0;
-  for (let b = 1; b < topBin; b++) if (hs[b] > hs[floorBin]) floorBin = b;
+  // Deux pics dominants : le plus bas en Y = sol, le plus haut = plafond
+  const gPeaks=[];
+  for (let b=1; b<N_HIST-1; b++) if(hs[b]>hs[b-1]&&hs[b]>hs[b+1]) gPeaks.push(b);
+  gPeaks.sort((a,b)=>hs[b]-hs[a]);
+  const gTop2=gPeaks.slice(0,2).sort((a,b)=>a-b);
+  const floorBin   = gTop2.length>=1 ? gTop2[0] : 0;
+  const ceilBin    = gTop2.length>=2 ? gTop2[1] : N_HIST-1;
   const floorYCenter = ymin + (floorBin + 0.5) / N_HIST * yRange;
-  const band = yRange * 0.05;   // bande ±5 % de l'étendue Y autour du sol
+  const ceilYCenter  = ymin + (ceilBin  + 0.5) / N_HIST * yRange;
+  const band = mmFloorTol * explorerScale;  // tolérance sol réglable (défaut ±20 cm)
 
   // ── 2. Hauteurs obstacles au-dessus du plancher ────────────────────
-  // On cherche les points entre obsMinH et obsMaxH au-dessus du sol.
-  // obsMaxH ≤ hauteur joueur × 1.5 pour éviter de marquer le plafond.
-  const obsMinH = Math.max(0.08, yRange * 0.02);   // ~2 % étendue Y, min 0.08
-  const obsMaxH = player.height * 1.5;              // 1.5 × hauteur joueur
+  // Hauteur réelle sol→plafond détectée par les deux pics dominants.
+  const obsMaxH = Math.abs(ceilYCenter - floorYCenter);
 
   // ── 3. Construction grille brute ───────────────────────────────────
+  // On utilise le sol LOCAL (heightMap.sample) comme référence par point :
+  // un sol irrégulier ne crée plus de faux obstacles car hAb est toujours
+  // relatif à la hauteur réelle du sol sous ce point précis.
+  // obsCount exige un seuil minimum pour ignorer les points parasites isolés.
   const hasFloor = new Uint8Array(gs * gs);
-  const hasObs   = new Uint8Array(gs * gs);
+  const obsCount = new Uint16Array(gs * gs);
+  const OBS_MIN  = 15;
 
   for (let i = 0; i < verts.length; i += 3) {
     const vx = verts[i], vy = verts[i+1], vz = verts[i+2];
     if (vx < xmin || vx > xmax || vz < zmin || vz > zmax) continue;
     const ix = Math.min(gs-1, Math.floor((vx - xmin) / spanX * gs));
     const iz = Math.min(gs-1, Math.floor((vz - zmin) / spanZ * gs));
+    // Sol global : référence unique pour tout l'espace.
+    // Les marches et dénivellations sont ainsi traitées comme des obstacles,
+    // ce qui est le comportement attendu pour la navigation robotique.
     const hAb = vy - floorYCenter;
-    if (hAb >= -band && hAb <= band)         hasFloor[iz*gs+ix] = 1;
-    else if (hAb > obsMinH && hAb < obsMaxH) hasObs  [iz*gs+ix] = 1;
+    if (hAb >= -band && hAb <= band)       hasFloor[iz*gs+ix] = 1;
+    else if (hAb > band && hAb < obsMaxH) obsCount [iz*gs+ix]++;
   }
+  const hasObs = new Uint8Array(gs * gs);
+  for (let i = 0; i < gs*gs; i++) if (obsCount[i] >= OBS_MIN) hasObs[i] = 1;
 
   // Grille : 0=libre, 1=obstacle, 2=inconnu (pas de données)
   const grid = new Uint8Array(gs * gs).fill(2);
@@ -1810,7 +2091,7 @@ function _los(x1, z1, x2, z2, occ) {
 
 // A* 8-directionnel + lissage ligne de vue
 function astarPath(startX, startZ, endX, endZ) {
-  if (!occGrid) occGrid = buildOccGrid(64);
+  if (!occGrid) occGrid = buildOccGrid(512);
   if (!occGrid) return null;
   const occ=occGrid, gs=occ.gs;
   const [sx,sz] = _wToG(startX, startZ, occ);
@@ -1904,7 +2185,7 @@ function clearPath() {
 function showPathToSalle(s) {
   clearPath();
   if (!sceneObject || !heightMap) { renderer.domElement.requestPointerLock(); return; }
-  if (!occGrid) occGrid = buildOccGrid(64);
+  if (!occGrid) occGrid = buildOccGrid(512);
 
   const end = salleToWorld(s);
   const path = astarPath(player.pos.x, player.pos.z, end.x, end.z);
@@ -2012,33 +2293,55 @@ document.getElementById('salle-search').addEventListener('focus', e => {
 // ═══════════════════════════════════════════════════════════════════════
 //  FILE INPUT
 // ═══════════════════════════════════════════════════════════════════════
-function handleFile(file) {
+async function handleFile(file) {
   if(!file||!file.name.toLowerCase().endsWith('.ply')) return;
   document.getElementById('drop-screen').classList.add('hidden');
   setProgress('LECTURE DU FICHIER…', 15);
 
-  const reader = new FileReader();
-  reader.onprogress = e => { if(e.lengthComputable) setProgress('LECTURE…', 15+e.loaded/e.total*40); };
-  reader.onload = e => {
+  const stem = file.name.replace(/\.ply$/i, '');
+
+  // Lancer en parallèle : lecture PLY (FileReader→Promise) + fetch JSON
+  const plyPromise = new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = e => { if(e.lengthComputable) setProgress('LECTURE…', 15+e.loaded/e.total*40); };
+    reader.onload  = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Lecture fichier échouée'));
+    reader.readAsArrayBuffer(file);
+  });
+
+  const jsonPromise = fetch(`database/${stem}.json?v=${Date.now()}`)
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+
+  try {
+    const [buffer, jd] = await Promise.all([plyPromise, jsonPromise]);
+
+    worldUpPreset     = 1;
+    pointSizeOverride = null;
+    if (jd) {
+      const rawFloor = typeof jd.floorY === 'number' ? jd.floorY
+                     : typeof jd.floor  === 'number' ? jd.floor
+                     : null;
+      if (typeof jd.upPreset === 'number') worldUpPreset = jd.upPreset;
+      pointSizeOverride = (typeof jd.pointSize === 'number') ? jd.pointSize : null;
+      loadSallesData(jd);
+      _loadFloorY(stem, rawFloor);
+    } else {
+      _loadFloorY(stem, null);
+    }
+    updateUpButton();
+
     setProgress('PARSING PLY…', 60);
-    setTimeout(()=>{
-      try {
-        const loader = new PLYLoader();
-        const parsed = loader.parse(e.target.result);
-        setProgress('CONSTRUCTION SCÈNE…', 85);
-        worldUpPreset = 1;
-        floorYOverride = null;
-        pointSizeOverride = null;
-        updateUpButton();
-        setTimeout(()=> loadParsed(parsed), 30);
-      } catch(err) {
-        hideProgress();
-        document.getElementById('drop-screen').classList.remove('hidden');
-        alert('Erreur de lecture: '+err.message);
-      }
-    }, 30);
-  };
-  reader.readAsArrayBuffer(file);
+    await new Promise(r => setTimeout(r, 30));
+    const parsed = new PLYLoader().parse(buffer);
+    setProgress('CONSTRUCTION SCÈNE…', 85);
+    await new Promise(r => setTimeout(r, 30));
+    loadParsed(parsed);
+  } catch(err) {
+    hideProgress();
+    document.getElementById('drop-screen').classList.remove('hidden');
+    alert('Erreur de lecture: '+err.message);
+  }
 }
 
 const dz = document.getElementById('drop-zone');

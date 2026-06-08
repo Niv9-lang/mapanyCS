@@ -11,6 +11,7 @@ class PathfindingUI {
         this.gridData   = null;
         this.floorInfo  = null;
         this._yRange    = 1.0;
+        this._explorerTransform = null;
 
         this.pointA = null;
         this.pointB = null;
@@ -40,31 +41,39 @@ class PathfindingUI {
 
     async _loadFloorInfo() {
         try {
-            const r = await fetch('/api/floor-info');
-            this.floorInfo = await r.json();
-            this._yRange   = this.floorInfo.y_range || 1.0;
+            const [rf, rt] = await Promise.all([
+                fetch('/api/floor-info'),
+                fetch('/api/explorer-transform'),
+            ]);
+            this.floorInfo          = await rf.json();
+            this._explorerTransform = await rt.json();
+            this._yRange = this.floorInfo.y_range || 1.0;
 
             const fi = this.floorInfo;
-            // Afficher les deux systèmes de coordonnées
             document.getElementById('floor-detected').innerHTML =
-                `<span style="color:var(--dim)">Viewer :</span> Y∈[<b>${fi.floor_y_min_viewer.toFixed(3)}</b>, <b>${fi.floor_y_max_viewer.toFixed(3)}</b>]<br>`
-                + `<span style="color:var(--dim)">PLY brut :</span> Y∈[${fi.floor_y_min.toFixed(3)}, ${fi.floor_y_max.toFixed(3)}]`;
-
-            // Pré-remplir avec les coordonnées VIEWER (ce que l'utilisateur voit)
-            document.getElementById('inp-fy-min').value = fi.floor_y_min_viewer.toFixed(3);
-            document.getElementById('inp-fy-max').value = fi.floor_y_max_viewer.toFixed(3);
-
-            if (fi.ceil_y_center !== null) {
-                const ceil_v = (fi.y_ply_center - fi.ceil_y_center).toFixed(3);
-                document.getElementById('floor-warn').textContent =
-                    `Plafond détecté à Y viewer ≈ ${ceil_v}`;
-            }
+                `<span style="color:var(--dim)">Axe :</span> <b>${fi.vertical_axis}</b>`
+                + `&emsp;<span style="color:var(--dim)">Sol :</span> <b>${fi.floor_y_center.toFixed(4)}</b>`;
+            const roomH = fi.ceil_y_center != null
+                ? Math.abs(fi.ceil_y_center - fi.floor_y_center).toFixed(4) : '—';
+            document.getElementById('floor-heights').innerHTML =
+                `<span style="color:var(--dim)">Hauteur pièce :</span> <b>${roomH}</b>`;
 
             this._updateSliderLabels();
-            this._setStatus('idle', 'Sol détecté. Ajuster si incorrect, puis générer la carte.');
+            // Générer la grille automatiquement au chargement
+            this._generateGrid();
         } catch (e) {
             document.getElementById('floor-detected').textContent = 'Erreur chargement';
         }
+    }
+
+    // Convertit des coordonnées PLY brutes (curseur pathfinding) en coordonnées
+    // PLY_explorer.html — même transformation : centrage + normalisation 30u + rotation.
+    _toExplorerCoords(rawX, rawZ) {
+        const t = this._explorerTransform;
+        if (!t) return { x: rawX, z: rawZ };
+        const x = t.x_sign * (rawX - t.center[t.x_center_col]) * t.scale;
+        const z = t.z_sign * (rawZ - t.center[t.z_center_col]) * t.scale;
+        return { x, z };
     }
 
     // ─────────────────────────────────────────────
@@ -106,8 +115,9 @@ class PathfindingUI {
 
             const dir = this.gridData.obstacles_above ? 'au-dessus' : 'en-dessous';
             this._setStatus('ok',
-                `✓ Carte générée — sol Y[${this.gridData.floor_y_min.toFixed(3)}, `
-                + `${this.gridData.floor_y_max.toFixed(3)}] — obstacles ${dir} — `
+                `✓ Carte générée — sol [${this.gridData.floor_y_min.toFixed(3)}, `
+                + `${this.gridData.floor_y_max.toFixed(3)}] — `
+                + `obstacles ${dir} jusqu'à ${this.gridData.obstacle_max_h.toFixed(3)} — `
                 + `${pct}% obstacles — ${this.gridData.free_cells.toLocaleString()} libres`);
 
         } catch (e) {
@@ -319,7 +329,10 @@ class PathfindingUI {
                 const rect=c.getBoundingClientRect();
                 if (e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom) {
                     const wp=this._c2w((e.clientX-rect.left)*(c.width/rect.width),(e.clientY-rect.top)*(c.height/rect.height));
-                    if (wp) document.getElementById('cursor-coords').textContent=`X: ${wp.x.toFixed(3)}   Z: ${wp.z.toFixed(3)}`;
+                    if (wp) {
+                        const ec = this._toExplorerCoords(wp.x, wp.z);
+                        document.getElementById('cursor-coords').textContent=`X: ${ec.x.toFixed(3)}   Z: ${ec.z.toFixed(3)}`;
+                    }
                 }
             }
         });
@@ -341,32 +354,19 @@ class PathfindingUI {
             document.getElementById('btn-path').disabled=true;
             this._setStatus('idle','Points effacés.'); this.draw();
         });
-        document.getElementById('btn-reset-floor').addEventListener('click',()=>{
-            if (this.floorInfo) {
-                document.getElementById('inp-fy-min').value=this.floorInfo.floor_y_min_viewer.toFixed(3);
-                document.getElementById('inp-fy-max').value=this.floorInfo.floor_y_max_viewer.toFixed(3);
-            }
-        });
     }
 
     _bindSliders() {
-        // Sliders qui affectent la grille → marquer comme périmée si la carte est déjà générée
-        ['sl-gs','sl-minh','sl-maxh','sl-rad'].forEach(id=>
-            document.getElementById(id).addEventListener('input',()=>{
-                this._updateSliderLabels();
-                if (this.gridData) this._markStale();
-            }));
-        ['inp-fy-min','inp-fy-max'].forEach(id=>
-            document.getElementById(id).addEventListener('input',()=>{
-                if (this.gridData) this._markStale();
-            }));
-        // Slider d'échelle : affichage seulement, pas besoin de regénérer
-        document.getElementById('sl-scale').addEventListener('input',()=>this._updateSliderLabels());
+        document.getElementById('sl-tol').addEventListener('input', () => {
+            this._updateSliderLabels();
+            if (this.gridData) this._markStale();
+        });
+        document.getElementById('sl-scale').addEventListener('input', () => this._updateSliderLabels());
     }
 
     _markStale() {
         document.getElementById('btn-gen').classList.add('stale');
-        this._setStatus('idle','⚠ Paramètres modifiés — regénérer la carte avant de calculer.');
+        this._setStatus('idle', '⚠ Tolérance modifiée — regénérer la carte.');
     }
 
     _clearStale() {
@@ -374,34 +374,17 @@ class PathfindingUI {
     }
 
     _updateSliderLabels() {
-        const yr=this._yRange||1.0;
-        document.getElementById('lbl-gs').textContent    = document.getElementById('sl-gs').value;
-        document.getElementById('lbl-rad').textContent   = document.getElementById('sl-rad').value;
+        const tolM = parseFloat(document.getElementById('sl-tol').value);
+        document.getElementById('lbl-tol').textContent = tolM >= 1 ? tolM.toFixed(2)+' m' : (tolM*100).toFixed(0)+' cm';
         document.getElementById('lbl-scale').textContent = document.getElementById('sl-scale').value;
-        const minPct=parseInt(document.getElementById('sl-minh').value);
-        const maxPct=parseInt(document.getElementById('sl-maxh').value);
-        document.getElementById('lbl-minh').textContent=(yr*minPct/100).toFixed(3);
-        document.getElementById('lbl-maxh').textContent=(yr*maxPct/100).toFixed(3);
     }
 
     _getParams() {
-        const yr    =this._yRange||1.0;
-        const minPct=parseInt(document.getElementById('sl-minh').value);
-        const maxPct=parseInt(document.getElementById('sl-maxh').value);
-        const fyMin =document.getElementById('inp-fy-min').value.trim();
-        const fyMax =document.getElementById('inp-fy-max').value.trim();
-        const p={
-            grid_size:    parseInt(document.getElementById('sl-gs').value),
-            min_h:        parseFloat((yr*minPct/100).toFixed(4)),
-            max_h:        parseFloat((yr*maxPct/100).toFixed(4)),
-            robot_radius: parseInt(document.getElementById('sl-rad').value),
+        return {
+            floor_tolerance: parseFloat(document.getElementById('sl-tol').value),
+            robot_radius:    2,
+            obs_min_count:   5,
         };
-        if (fyMin!==''&&fyMax!=='') {
-            p.floor_y_min    = parseFloat(fyMin);
-            p.floor_y_max    = parseFloat(fyMax);
-            p.viewer_coords  = 1;   // les inputs sont en coordonnées viewer
-        }
-        return p;
     }
 
     // ─────────────────────────────────────────────
