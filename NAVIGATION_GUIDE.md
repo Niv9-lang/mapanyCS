@@ -125,10 +125,12 @@ python reconstruction_medium.py \
 ### Launch
 
 ```bash
-python -m http.server 8080
+python -m http.server 8080 --bind 127.0.0.1
 ```
 
 Then open in your browser: **`http://localhost:8080/PLY_explorer.html`**
+
+> **Security note:** Without `--bind 127.0.0.1`, the server is reachable by anyone on your local network (same Wi-Fi or LAN), exposing all files in the project folder. The `--bind 127.0.0.1` flag restricts access to your machine only. The Flask server (`navigation_obstacle.py`) is already localhost-only by default.
 
 You can also drag and drop a `.ply` file directly into the browser window.
 
