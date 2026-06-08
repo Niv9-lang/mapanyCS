@@ -178,16 +178,63 @@ A real-time 2D map displayed in the top-right corner. Shows the player's positio
 - **2nd click** → sets end point B and automatically computes the path
 - **3rd click** → resets both points
 - The result is shown at the bottom: distance in metres and number of waypoints
-- The **Floor±** slider adjusts the obstacle detection sensitivity (default: 20 cm)
+- The **Floor±** slider adjusts the obstacle detection sensitivity (default: 20 cm — objects less than this height above the floor are ignored as obstacles)
 
-#### Annotated rooms
-If a `.json` file is associated with the reconstruction, rooms are displayed as labels in the 3D scene and on the minimap. A notification appears automatically when approaching a room.
+#### Annotated rooms and JSON configuration
+
+PLY Explorer can automatically display room labels, proximity notifications, and transition markers when a **JSON annotation file** is provided alongside the reconstruction.
+
+**How it works:**
+- The JSON file must be placed in the **same folder** as its corresponding `.ply` file
+- It must have the **exact same filename**, only the extension differs
+
+```
+database/
+├── vivant_RDC.ply       ← 3D reconstruction
+└── vivant_RDC.json      ← annotation file (same name, same folder)
+```
+
+If PLY Explorer finds a matching JSON file when a reconstruction is loaded, it reads it automatically — no manual action required.
+
+**What the JSON file enables:**
+- **Room labels** — named locations displayed as floating labels in the 3D scene and on the minimap. A notification appears automatically when the player moves within range of a room.
+- **Space transitions** — golden markers placed at doorways, staircases, or elevators. Pressing `L` near a marker opens a menu to travel to another reconstruction.
+- **Floor calibration** — the `floorY` value overrides the automatic floor detection, ensuring the player spawns at the correct height and the occupancy grid is computed accurately.
+- **Vertical axis** — the `upPreset` value tells PLY Explorer which axis is "up" in this particular file, so the model is oriented correctly on load.
+
+**Minimal JSON example** (rooms only, no transitions):
+```json
+{
+  "proximite_seuil": 2.0,
+  "floorY": -0.85,
+  "upPreset": 1,
+  "salles": [
+    {
+      "id": "101",
+      "nom": "Room 101",
+      "x": 1.23,
+      "y": 0.0,
+      "z": -2.45,
+      "description": "Classroom — Ground floor"
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `proximite_seuil` | Distance (in scene units) within which a room label becomes active |
+| `floorY` | Floor height in viewer coordinates — adjust if the player spawns above or below the floor |
+| `upPreset` | Vertical axis — `1` for MASt3r / MapAnything outputs, `2` for CloudCompare exports |
+| `salles` | Array of rooms, each with an `id`, display name (`nom`), XYZ position, and optional `description` |
+
+> The XYZ coordinates for rooms and transitions correspond to positions as seen in the viewer's HUD (displayed bottom-left while navigating).
 
 #### Space transitions
-Golden markers indicate passage points to other spaces (stairs, elevators, etc.). Approach a marker and press `L` to choose your destination.
+Golden markers indicate passage points to other spaces (stairs, elevators, etc.). Approach a marker and press `L` to choose your destination. See [Section 6](#6-managing-multiple-spaces) for the full transition format including arrival coordinates (`spawn`).
 
 #### Orientation correction
-If the model appears upside down or lying on its side, press `G` to cycle through available orientations until the vertical axis looks correct.
+If the model appears upside down or lying on its side, press `G` to cycle through available orientations until the vertical axis looks correct. Once the correct orientation is found, save it as `upPreset` in the JSON file so it is applied automatically on future loads.
 
 ---
 
